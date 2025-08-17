@@ -1,19 +1,14 @@
 package com.provaweb.jogosinternos.dto;
 
-
 import lombok.Data;
 
 @Data
-public class AtletaDTO {
+public class AtletaResumoDTO {
     private Long id;
     private String nomeCompleto;
-    private String apelido;
     private String matricula;
+    private String email;
     private String telefone;
+    private String curso;
     private boolean tecnico;
-    private String equipeNome;
-    private String esporteNome;
-    private String eventoNome;
-    private String tipo;
-
 }

@@ -1,13 +1,21 @@
 package com.provaweb.jogosinternos.services;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.provaweb.jogosinternos.entities.Atleta;
+import com.provaweb.jogosinternos.entities.Coordenador;
 import com.provaweb.jogosinternos.entities.Jogo;
+import com.provaweb.jogosinternos.repositories.AtletaRepository;
+import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
 import com.provaweb.jogosinternos.repositories.JogoRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -15,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 public class JogoService {
     private final JogoRepository jogoRepository;
     private final GrupoService grupoService;
+    private final AtletaRepository atletaRepository;
+    private final CoordenadorRepository coordenadorRepository;
 
     public Jogo criarJogo(Jogo jogo) {
         validarJogo(jogo);
@@ -118,4 +128,33 @@ public class JogoService {
         return jogoRepository.findDistinctFases();
     }
 
+    public List<Jogo> listarPorEquipe(Long equipeId) {
+        return jogoRepository.findByEquipeId(equipeId);
+    }
+
+    public List<Jogo> listarPorMatriculaAtleta(String matricula) {
+        Atleta atleta = atletaRepository.findByMatriculaWithEquipe(matricula)
+                .orElseThrow(() -> new EntityNotFoundException("Atleta não encontrado"));
+
+        if (atleta.getEquipe() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Você não está vinculado a nenhuma equipe");
+        }
+
+        // Agora passando a mesma equipe para ambos os parâmetros
+        return jogoRepository.findByEquipe1OrEquipe2WithDetails(atleta.getEquipe(), atleta.getEquipe());
+    }
+
+    public List<Jogo> buscarJogosPorCoordenador(String matricula) {
+        Coordenador coordenador = coordenadorRepository.findById(matricula)
+                .orElseThrow(() -> new RuntimeException("Coordenador não encontrado"));
+
+        if (coordenador.getCurso() == null) {
+            return Collections.emptyList();
+        }
+
+        // Usando a consulta JPQL corrigida
+        return jogoRepository.findByCursoId(coordenador.getCurso().getId());
+    }
 }

@@ -10,7 +10,7 @@ public class EliminatoriaDTO {
     private String equipe2Nome;
     private Integer placarEquipe1;
     private Integer placarEquipe2;
-    private String status;
+    private String status; // "FINALIZADO" ou "AGENDADO"
     private String vencedor;
 
     public EliminatoriaDTO(Jogo jogo) {

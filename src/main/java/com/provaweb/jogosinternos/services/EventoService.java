@@ -1,10 +1,12 @@
 package com.provaweb.jogosinternos.services;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.entities.Evento;
 import com.provaweb.jogosinternos.entities.TipoEvento;
 import com.provaweb.jogosinternos.repositories.EquipeRepository;
@@ -63,5 +65,37 @@ public class EventoService {
         if (evento.getDataFim().isBefore(evento.getDataInicio())) {
             throw new RuntimeException("data final não pode ser anterior à data inicial");
         }
+    }
+
+    public List<Evento> listarEventosDisponiveis() {
+        LocalDate hoje = LocalDate.now();
+        return eventoRepository.findByDataInicioAfter(hoje);
+    }
+
+    @Transactional
+    public void inscreverEquipe(Long eventoId, Long equipeId) {
+        Evento evento = eventoRepository.findById(eventoId)
+                .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
+
+        Equipe equipe = equipeRepository.findById(equipeId)
+                .orElseThrow(() -> new RuntimeException("Equipe não encontrada"));
+
+        // Verificar se a equipe já está inscrita
+        if (equipe.getEvento() != null && equipe.getEvento().getId().equals(eventoId)) {
+            throw new RuntimeException("Equipe já inscrita neste evento");
+        }
+
+        // Verificar se já existe equipe do mesmo curso/esporte
+        boolean existeInscricao = equipeRepository.existsByEventoIdAndCursoIdAndEsporteId(
+                eventoId,
+                equipe.getCurso().getId(),
+                equipe.getEsporte().getId());
+
+        if (existeInscricao) {
+            throw new RuntimeException("Já existe uma equipe deste curso/esporte no evento");
+        }
+
+        equipe.setEvento(evento);
+        equipeRepository.save(equipe);
     }
 }

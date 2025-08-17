@@ -2,7 +2,10 @@ package com.provaweb.jogosinternos.entities;
 
 import com.provaweb.jogosinternos.dto.AtletaDTO;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -20,6 +23,10 @@ public class Atleta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TipoUsuario tipo = TipoUsuario.ATLETA;
+
     private String nomeCompleto;
     private String apelido;
     private String matricula;
@@ -36,7 +43,13 @@ public class Atleta {
 
     public AtletaDTO toDTO() {
         AtletaDTO dto = new AtletaDTO();
+        dto.setId(this.id);
         dto.setNomeCompleto(this.nomeCompleto);
+        dto.setApelido(this.apelido);
+        dto.setMatricula(this.matricula);
+        dto.setTelefone(this.telefone);
+        dto.setTecnico(this.tecnico);
+        dto.setTipo(this.tipo != null ? this.tipo.name() : null);
 
         if (this.equipe != null) {
             dto.setEquipeNome(this.equipe.getNome());

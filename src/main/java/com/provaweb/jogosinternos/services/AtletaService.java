@@ -8,19 +8,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.provaweb.jogosinternos.dto.AtletaDTO;
 import com.provaweb.jogosinternos.entities.Atleta;
-import com.provaweb.jogosinternos.entities.Coordenador;
 import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.repositories.AtletaRepository;
-import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
 import com.provaweb.jogosinternos.repositories.EquipeRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class AtletaService {
     private final AtletaRepository atletaRepository;
-    private final CoordenadorRepository coordenadorRepository;
     private final EquipeRepository equipeRepository;
 
     public Atleta cadastrarAtleta(Atleta atleta) {
@@ -54,13 +52,30 @@ public class AtletaService {
 
     public Atleta atualizarAtleta(Long id, Atleta atleta) {
         Atleta existente = buscarPorId(id);
-        existente.setNomeCompleto(atleta.getNomeCompleto());
-        existente.setApelido(atleta.getApelido());
-        existente.setMatricula(atleta.getMatricula());
-        existente.setTelefone(atleta.getTelefone());
-        existente.setSenha(atleta.getSenha());
+
+        // Atualiza apenas os campos não nulos
+        if (atleta.getNomeCompleto() != null) {
+            existente.setNomeCompleto(atleta.getNomeCompleto());
+        }
+        if (atleta.getApelido() != null) {
+            existente.setApelido(atleta.getApelido());
+        }
+        if (atleta.getMatricula() != null) {
+            existente.setMatricula(atleta.getMatricula());
+        }
+        if (atleta.getTelefone() != null) {
+            existente.setTelefone(atleta.getTelefone());
+        }
+        if (atleta.getSenha() != null && !atleta.getSenha().isEmpty()) {
+            existente.setSenha(atleta.getSenha());
+        }
+
         existente.setTecnico(atleta.isTecnico());
-        existente.setEquipe(atleta.getEquipe());
+
+        if (atleta.getEquipe() != null) {
+            existente.setEquipe(atleta.getEquipe());
+        }
+
         return atletaRepository.save(existente);
     }
 
@@ -75,39 +90,21 @@ public class AtletaService {
         atletaRepository.deleteById(id);
     }
 
-    public void definirTecnico(Long atletaId, String coordenadorId) {
+    public Atleta definirComoTecnico(Long atletaId) {
         Atleta atleta = atletaRepository.findById(atletaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Atleta não encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Atleta não encontrado"));
 
-        Coordenador coordenador = coordenadorRepository.findById(coordenadorId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Coordenador não encontrado"));
-
-        if (atleta.getCurso() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atleta não possui curso definido.");
-        }
-
-        if (!coordenador.getCurso().getId().equals(atleta.getCurso().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Coordenador não autorizado para definir técnico neste curso.");
-        }
-
-        if (atleta.getEquipe() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atleta não está associado a uma equipe.");
-        }
-
-        Long equipeId = atleta.getEquipe().getId();
-        boolean existeTecnico = atletaRepository.existsByEquipeIdAndTecnicoTrue(equipeId);
-        if (existeTecnico) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Equipe já possui um técnico");
-        }
+        // Remove status de técnico de qualquer outro atleta do mesmo curso
+        atletaRepository.removerStatusTecnicoDoCurso(atleta.getCurso().getId());
 
         atleta.setTecnico(true);
-        atletaRepository.save(atleta);
+        return atletaRepository.save(atleta);
     }
 
     public boolean isTecnico(Long atletaId) {
-        Atleta tecnico = atletaRepository.findByIdAndTecnicoTrue(atletaId);
-        return tecnico != null;
+        return atletaRepository.findById(atletaId)
+                .map(Atleta::isTecnico)
+                .orElse(false);
     }
 
     public Atleta atualizarEquipe(Long atletaId, Long equipeId, Long tecnicoId) {
@@ -133,4 +130,14 @@ public class AtletaService {
                 .orElseThrow(() -> new RuntimeException("Atleta não encontrado"));
         return atleta.toDTO();
     }
+
+    public Atleta buscarPorMatricula(String matricula) {
+        return atletaRepository.findByMatriculaWithEquipe(matricula)
+                .orElseThrow(() -> new EntityNotFoundException("Atleta não encontrado com a matrícula: " + matricula));
+    }
+
+    public List<Atleta> findAtletasSemEquipe() {
+        return atletaRepository.findByEquipeIsNull();
+    }
+
 }

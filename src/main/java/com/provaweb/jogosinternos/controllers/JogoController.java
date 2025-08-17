@@ -56,27 +56,31 @@ public class JogoController {
     }
 
     @PutMapping("/{id}/placar")
-    public Jogo atualizarPlacar(
+    public ResponseEntity<JogoDTO> atualizarPlacar(
             @PathVariable Long id,
             @RequestBody AtualizarPlacarDTO dto) {
-        return jogoService.atualizarPlacar(id, dto.getPlacarEquipe1(), dto.getPlacarEquipe2());
+        Jogo atualizado = jogoService.atualizarPlacar(id, dto.getPlacarEquipe1(), dto.getPlacarEquipe2());
+        return ResponseEntity.ok(new JogoDTO(atualizado));
     }
 
     @PutMapping("/{id}/wo")
-    public Jogo registrarWO(
+    public ResponseEntity<JogoDTO> registrarWO(
             @PathVariable Long id,
             @RequestParam(required = false) Long equipeId) {
-        return jogoService.registrarWO(id, equipeId);
+        Jogo atualizado = jogoService.registrarWO(id, equipeId);
+        return ResponseEntity.ok(new JogoDTO(atualizado));
     }
 
     @DeleteMapping("/{id}")
-    public void cancelarJogo(@PathVariable Long id) {
+    public ResponseEntity<Void> cancelarJogo(@PathVariable Long id) {
         jogoService.cancelarJogo(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/desfazer-wo")
-    public Jogo desfazerWO(@PathVariable Long id) {
-        return jogoService.desfazerWO(id);
+    public ResponseEntity<JogoDTO> desfazerWO(@PathVariable Long id) {
+        Jogo atualizado = jogoService.desfazerWO(id);
+        return ResponseEntity.ok(new JogoDTO(atualizado));
     }
 
     @GetMapping("/fases")
@@ -84,4 +88,32 @@ public class JogoController {
         return ResponseEntity.ok(jogoService.listarFases());
     }
 
+    @GetMapping("/equipe/{equipeId}")
+    public ResponseEntity<List<JogoDTO>> listarPorEquipe(@PathVariable Long equipeId) {
+        List<Jogo> jogos = jogoService.listarPorEquipe(equipeId);
+        List<JogoDTO> dtos = jogos.stream()
+                .map(JogoDTO::new)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/atleta/matricula/{matricula}")
+    public ResponseEntity<List<JogoDTO>> listarPorMatriculaAtleta(
+            @PathVariable String matricula) {
+
+        System.out.println("Buscando jogos para matrícula: " + matricula);
+
+        List<Jogo> jogos = jogoService.listarPorMatriculaAtleta(matricula);
+        List<JogoDTO> dtos = jogos.stream()
+                .map(JogoDTO::new)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/coordenador/{matricula}")
+    public ResponseEntity<List<Jogo>> listarJogosPorCoordenador(@PathVariable String matricula) {
+        List<Jogo> jogos = jogoService.buscarJogosPorCoordenador(matricula);
+        return ResponseEntity.ok(jogos);
+    }
 }

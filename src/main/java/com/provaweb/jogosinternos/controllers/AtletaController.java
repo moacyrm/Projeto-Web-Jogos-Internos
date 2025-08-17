@@ -12,6 +12,7 @@ import com.provaweb.jogosinternos.entities.Atleta;
 import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.services.AtletaService;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -42,9 +43,22 @@ public class AtletaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AtletaDTO> atualizar(@PathVariable Long id, @RequestBody Atleta atleta) {
-        Atleta atualizado = atletaService.atualizarAtleta(id, atleta);
-        return ResponseEntity.ok(atualizado.toDTO());
+    public ResponseEntity<?> atualizarAtleta(
+            @PathVariable Long id,
+            @RequestBody Atleta atualizacoes) {
+
+        try {
+            Atleta atletaAtualizado = atletaService.atualizarAtleta(id, atualizacoes);
+            return ResponseEntity.ok(atletaAtualizado.toDTO());
+
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Atleta não encontrado");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao atualizar atleta: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -54,9 +68,8 @@ public class AtletaController {
     }
 
     @PutMapping("/{id}/definir-tecnico")
-    public ResponseEntity<Void> definirTecnico(@PathVariable Long id, @RequestParam String coordenadorId) {
-        atletaService.definirTecnico(id, coordenadorId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Atleta> definirComoTecnico(@PathVariable Long id) {
+        return ResponseEntity.ok(atletaService.definirComoTecnico(id));
     }
 
     @GetMapping("/{id}/tecnico")
@@ -70,14 +83,14 @@ public class AtletaController {
     }
 
     @PutMapping("/{id}/equipe")
-   public ResponseEntity<AtletaDTO> atualizarEquipe(
-        @PathVariable Long id,
-        @RequestParam Long equipeId,
-        @RequestParam(required = false) Long tecnicoId) {
+    public ResponseEntity<AtletaDTO> atualizarEquipe(
+            @PathVariable Long id,
+            @RequestParam Long equipeId,
+            @RequestParam(required = false) Long tecnicoId) {
 
-    Atleta atualizado = atletaService.atualizarEquipe(id, equipeId, tecnicoId);
-    return ResponseEntity.ok(atualizado.toDTO());
-}
+        Atleta atualizado = atletaService.atualizarEquipe(id, equipeId, tecnicoId);
+        return ResponseEntity.ok(atualizado.toDTO());
+    }
 
     @GetMapping("/equipe/{equipeId}")
     public ResponseEntity<List<AtletaDTO>> listarPorEquipe(@PathVariable Long equipeId) {
@@ -88,11 +101,10 @@ public class AtletaController {
         return ResponseEntity.ok(dtos);
     }
 
-    @GetMapping("/{atletaId}/equipe/{equipeId}")
-    public ResponseEntity<AtletaDTO> buscarAtletaNaEquipe(
-            @PathVariable Long atletaId,
-            @PathVariable Long equipeId) {
-        Atleta atleta = atletaService.buscarAtletaNaEquipe(atletaId, equipeId);
+    @GetMapping("/matricula/{matricula}")
+    public ResponseEntity<AtletaDTO> buscarPorMatricula(@PathVariable String matricula) {
+        Atleta atleta = atletaService.buscarPorMatricula(matricula);
         return ResponseEntity.ok(atleta.toDTO());
     }
+
 }

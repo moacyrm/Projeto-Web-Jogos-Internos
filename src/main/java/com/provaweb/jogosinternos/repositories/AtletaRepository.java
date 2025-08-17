@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.provaweb.jogosinternos.entities.Atleta;
 
@@ -19,4 +22,23 @@ public interface AtletaRepository extends JpaRepository<Atleta, Long> {
     List<Atleta> findByEquipeId(Long equipeId);
 
     Optional<Atleta> findByIdAndEquipeId(Long atletaId, Long equipeId);
+
+    Optional<Atleta> findByMatricula(String matricula);
+
+    Optional<Atleta> findByMatriculaIgnoreCase(String matricula);
+
+    @Query("SELECT a FROM Atleta a WHERE a.equipe.id = :equipeId")
+    List<Atleta> findByEquipeIdWithDetails(@Param("equipeId") Long equipeId);
+
+    @Query("SELECT a FROM Atleta a LEFT JOIN FETCH a.equipe e LEFT JOIN FETCH e.esporte WHERE a.matricula = :matricula")
+    Optional<Atleta> findByMatriculaWithEquipe(@Param("matricula") String matricula);
+
+    List<Atleta> findByEquipeIsNull();
+
+    @Modifying
+    @Query("UPDATE Atleta a SET a.tecnico = false WHERE a.curso.id = :cursoId")
+    void removerStatusTecnicoDoCurso(Long cursoId);
+
+    List<Atleta> findByCursoId(Long cursoId);
+
 }

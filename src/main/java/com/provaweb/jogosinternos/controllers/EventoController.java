@@ -2,6 +2,7 @@ package com.provaweb.jogosinternos.controllers;
 
 import java.util.List;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,6 +53,20 @@ public class EventoController {
     @DeleteMapping("/{id}")
     public void deletar(@PathVariable Long id) {
         eventoService.deletarEvento(id);
+    }
+
+    @GetMapping("/disponiveis")
+    public ResponseEntity<List<Evento>> listarEventosDisponiveis() {
+        List<Evento> eventos = eventoService.listarEventosDisponiveis();
+        return ResponseEntity.ok(eventos);
+    }
+
+    @PostMapping("/{eventoId}/inscrever-equipe/{equipeId}")
+    public ResponseEntity<Void> inscreverEquipe(
+            @PathVariable Long eventoId,
+            @PathVariable Long equipeId) {
+        eventoService.inscreverEquipe(eventoId, equipeId);
+        return ResponseEntity.ok().build();
     }
 
 }

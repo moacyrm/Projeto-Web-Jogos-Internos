@@ -18,9 +18,11 @@ public class Jogo {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "equipe1_id")
     private Equipe equipe1;
 
     @ManyToOne
+    @JoinColumn(name = "equipe2_id")
     private Equipe equipe2;
 
     private int placarEquipe1;
@@ -42,8 +44,10 @@ public class Jogo {
 
     private String fase;
 
+    private String status;
+
     @ManyToOne
-    @JoinColumn(name = "chave_eliminatoria_id") 
+    @JoinColumn(name = "chave_eliminatoria_id")
     private ChaveEliminatoria chaveEliminatoria;
 
     @ManyToOne

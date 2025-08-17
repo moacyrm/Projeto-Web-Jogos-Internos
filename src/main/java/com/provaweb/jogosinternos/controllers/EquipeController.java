@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.provaweb.jogosinternos.dto.EquipeDTO;
+import com.provaweb.jogosinternos.dto.EquipeDetalhesDTO;
 import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.services.EquipeService;
 
@@ -19,7 +20,8 @@ public class EquipeController {
     private final EquipeService equipeService;
 
     @PostMapping
-    public ResponseEntity<EquipeDTO> cadastrar(@RequestBody Equipe equipe, @RequestParam(required = false) Long tecnicoId) {
+    public ResponseEntity<EquipeDTO> cadastrar(@RequestBody Equipe equipe,
+            @RequestParam(required = false) Long tecnicoId) {
         try {
             Equipe nova = equipeService.cadastEquipe(equipe, tecnicoId);
             return ResponseEntity.ok(nova.toDTO());
@@ -61,4 +63,15 @@ public class EquipeController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @GetMapping("/atleta/{matricula}")
+    public ResponseEntity<EquipeDetalhesDTO> getEquipePorAtleta(@PathVariable String matricula) {
+        try {
+            EquipeDetalhesDTO detalhes = equipeService.getEquipeDetalhesPorMatriculaAtleta(matricula);
+            return ResponseEntity.ok(detalhes);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(null);
+        }
+    }
+
 }

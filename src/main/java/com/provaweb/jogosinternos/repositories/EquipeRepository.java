@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.provaweb.jogosinternos.entities.Atleta;
 import com.provaweb.jogosinternos.entities.Equipe;
 
 public interface EquipeRepository extends JpaRepository<Equipe, Long> {
@@ -30,5 +31,10 @@ public interface EquipeRepository extends JpaRepository<Equipe, Long> {
     Optional<Equipe> findByNome(String nome);
 
     List<Equipe> findByCursoId(Long cursoId);
+
+    @Query("SELECT a FROM Atleta a LEFT JOIN FETCH a.equipe WHERE a.matricula = :matricula")
+    Optional<Atleta> findByMatriculaWithEquipe(@Param("matricula") String matricula);
+
+    boolean existsByEventoIdAndCursoIdAndEsporteId(Long eventoId, Long cursoId, Long esporteId);
 
 }
