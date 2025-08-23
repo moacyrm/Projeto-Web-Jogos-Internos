@@ -26,8 +26,8 @@ public class EventoController {
     private final EventoService eventoService;
 
     @PostMapping
-    public Evento criar(@RequestBody Evento evento) {
-        return eventoService.criarEvento(evento);
+    public Evento criar(@RequestBody Evento evento, String matricula) {
+        return eventoService.criarEvento(evento, matricula);
     }
 
     @GetMapping

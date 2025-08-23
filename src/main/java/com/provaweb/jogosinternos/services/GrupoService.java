@@ -29,7 +29,6 @@ public class GrupoService {
 
     @Transactional
     public List<Grupo> sortearGrupo(Long eventoId) {
-        //exceções
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
 
@@ -40,29 +39,31 @@ public class GrupoService {
         List<Equipe> equipes = equipeRepository.findByEventoId(eventoId);
         Collections.shuffle(equipes);
 
-            for (Equipe equipe : equipes) { //verifica se a equipe tem curso associado
-        if (equipe.getCurso() == null) {
-            throw new RuntimeException(
-                "Equipe '" + equipe.getNome() + "' não tem curso associado. " +
-                "Por favor, associe um curso válido à equipe antes do sorteio.");
-        }
+        // validações (mantenha suas checagens atuais)
+        for (Equipe equipe : equipes) {
+            if (equipe.getCurso() == null) {
+                throw new RuntimeException(
+                        "Equipe '" + equipe.getNome() + "' não tem curso associado. " +
+                                "Por favor, associe um curso válido à equipe antes do sorteio.");
+            }
 
-        Curso curso = cursoRepository.findById(equipe.getCurso().getId())//busca o curso no banco
-            .orElseThrow(() -> new RuntimeException(
-                "Curso associado à equipe '" + equipe.getNome() + "' não encontrado no sistema"));
+            Curso curso = cursoRepository.findById(equipe.getCurso().getId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Curso associado à equipe '" + equipe.getNome() + "' não encontrado no sistema"));
 
-        if (curso.getTipo() == null) {//verifica se tem tipo definido
-            throw new RuntimeException(
-                "Curso '" + curso.getNome() + "' não tem tipo definido. " +
-                "Defina o tipo do curso no cadastro antes do sorteio.");
-        }
+            if (curso.getTipo() == null) {
+                throw new RuntimeException(
+                        "Curso '" + curso.getNome() + "' não tem tipo definido. " +
+                                "Defina o tipo do curso no cadastro antes do sorteio.");
+            }
 
-        if (!curso.getTipo().equals(evento.getTipoEvento())) {//verifica se o curso é igual o evento
-            throw new RuntimeException(
-                "Tipo do curso '" + curso.getNome() + "' (" + curso.getTipo() + ") " +
-                "não é compatível com o tipo do evento (" + evento.getTipoEvento() + ")");
-        }
-            long numAtletas = atletaRepository.countByEquipeId(equipe.getId());//conta aletas da equipe
+            if (!curso.getTipo().equals(evento.getTipoEvento())) {
+                throw new RuntimeException(
+                        "Tipo do curso '" + curso.getNome() + "' (" + curso.getTipo() + ") " +
+                                "não é compatível com o tipo do evento (" + evento.getTipoEvento() + ")");
+            }
+
+            long numAtletas = atletaRepository.countByEquipeId(equipe.getId());
             if (numAtletas < equipe.getEsporte().getMinimoAtletas()) {
                 throw new RuntimeException("Equipe " + equipe.getNome() + " não tem atletas suficientes");
             }
@@ -75,7 +76,8 @@ public class GrupoService {
         List<Integer> tamanhosGrupos = definirDistribuicaoGrupos(equipes.size());
         List<Grupo> gruposCriados = new ArrayList<>();
 
-        for (int i = 0; i < tamanhosGrupos.size(); i++) {//cria os grupos com nome e evento
+        // 1) criar os objetos Grupo (sem equipes ainda)
+        for (int i = 0; i < tamanhosGrupos.size(); i++) {
             Grupo grupo = new Grupo();
             grupo.setNome("Grupo " + (i + 1));
             grupo.setEvento(evento);
@@ -83,29 +85,42 @@ public class GrupoService {
             gruposCriados.add(grupo);
         }
 
+        // 2) persistir os grupos primeiro para garantir ids
+        gruposCriados = grupoRepository.saveAll(gruposCriados);
+
+        // 3) distribuir equipes para os grupos salvos
         int equipeIndex = 0;
-        for (int i = 0; i < gruposCriados.size(); i++) {//distribuie as equipes nos grupos confome os tamanhos
-            Grupo grupo = gruposCriados.get(i);
+        for (int i = 0; i < gruposCriados.size(); i++) {
+            Grupo grupoSalvo = gruposCriados.get(i);
             int tamanho = tamanhosGrupos.get(i);
             for (int j = 0; j < tamanho; j++) {
                 Equipe equipe = equipes.get(equipeIndex++);
-                equipe.setGrupo(grupo);//associa a equipe ao grupo
-                grupo.getEquipes().add(equipe);//adiciona a equipe na lsta de grupos
+                // associa a equipe ao grupo salvo
+                equipe.setGrupo(grupoSalvo);
+                grupoSalvo.getEquipes().add(equipe);
             }
         }
 
+        // 4) salvar as equipes já com o grupo definido
         equipeRepository.saveAll(equipes);
+
+        // 5) (opcional) salvar os grupos novamente para sincronizar o lado
+        // "one-to-many"
         grupoRepository.saveAll(gruposCriados);
 
-        for (Grupo grupo : gruposCriados) {
-            criarConfronto(grupo);//cria os jogos entre as equipes dentro de cada grupo
+        // 6) criar confrontos: recarregando grupos com equipes para evitar problemas de
+        // detach/proxy
+        for (Grupo g : gruposCriados) {
+            Grupo grupoComEquipes = grupoRepository.findByIdWithEquipes(g.getId());
+            criarConfronto(grupoComEquipes);
         }
 
+        // retornar grupos do evento (com estado atualizado)
         return grupoRepository.findByEventoId(eventoId);
     }
 
     @Transactional
-    public List<Jogo> criarConfronto(Grupo grupo) {//gera todos os jogos possiveis entre as equipes de um grupo
+    public List<Jogo> criarConfronto(Grupo grupo) {// gera todos os jogos possiveis entre as equipes de um grupo
         List<Equipe> equipes = grupo.getEquipes();
         List<Jogo> jogos = new ArrayList<>();
         LocalDateTime inicio = LocalDateTime.now().plusDays(1).withHour(8).withMinute(0);
@@ -168,17 +183,17 @@ public class GrupoService {
     }
 
     private List<Integer> definirDistribuicaoGrupos(int totalEquipes) {
-        List<Integer> distribuicao = new ArrayList<>();//armazena o tamanho de cada grupo
-        while (totalEquipes >= 3) {//enquanto for possivel formar grupo com pelo menos 3 equipes
-            if (totalEquipes == 4 || totalEquipes == 5) {//se sobrar 4 ou 5
-                distribuicao.add(totalEquipes);//cria com 4 ou 5
+        List<Integer> distribuicao = new ArrayList<>();// armazena o tamanho de cada grupo
+        while (totalEquipes >= 3) {// enquanto for possivel formar grupo com pelo menos 3 equipes
+            if (totalEquipes == 4 || totalEquipes == 5) {// se sobrar 4 ou 5
+                distribuicao.add(totalEquipes);// cria com 4 ou 5
                 return distribuicao;
             }
-            if (totalEquipes % 3 == 1 && totalEquipes >= 4) {//se a divisao for 1 e tem mais de 4
-                distribuicao.add(4);//cria com 4
-                totalEquipes -= 4;//reduz o total
-            } else if (totalEquipes % 3 == 2 && totalEquipes >= 5) {//se a divisao for 2 e tem mais de 5
-                distribuicao.add(5);//reduz o total
+            if (totalEquipes % 3 == 1 && totalEquipes >= 4) {// se a divisao for 1 e tem mais de 4
+                distribuicao.add(4);// cria com 4
+                totalEquipes -= 4;// reduz o total
+            } else if (totalEquipes % 3 == 2 && totalEquipes >= 5) {// se a divisao for 2 e tem mais de 5
+                distribuicao.add(5);// reduz o total
                 totalEquipes -= 5;
             } else {
                 distribuicao.add(3);
@@ -192,7 +207,7 @@ public class GrupoService {
         return distribuicao;
     }
 
-    //dtos
+    // dtos
     public GrupoDTO montarGrupoDTOComConfrontos(Grupo grupo) {
         List<Jogo> jogos = jogoRepository.findByGrupoId(grupo.getId());
         GrupoDTO dto = new GrupoDTO();
@@ -214,7 +229,6 @@ public class GrupoService {
 
     public List<ClassificacaoDTO> getClassificacaoFinal(Long eventoId) {
 
-
         List<Jogo> finais = jogoRepository.findByEventoIdAndFase(eventoId, "Final");
         List<Jogo> semifinais = jogoRepository.findByEventoIdAndFaseStartingWith(eventoId, "Semifinal");
 
@@ -222,8 +236,9 @@ public class GrupoService {
             throw new RuntimeException("Jogos das finais incompletos ou ausentes.");
         }
 
-        Jogo finalJogo = finais.get(0);//pega o jogo da final
-        Equipe campeao = finalJogo.getPlacarEquipe1() > finalJogo.getPlacarEquipe2()//determina o campeao com base no placar
+        Jogo finalJogo = finais.get(0);// pega o jogo da final
+        Equipe campeao = finalJogo.getPlacarEquipe1() > finalJogo.getPlacarEquipe2()// determina o campeao com base no
+                                                                                    // placar
                 ? finalJogo.getEquipe1()
                 : finalJogo.getEquipe2();
 
@@ -231,7 +246,7 @@ public class GrupoService {
                 ? finalJogo.getEquipe1()
                 : finalJogo.getEquipe2();
 
-        List<Equipe> semifinalistas = new ArrayList<>();//lista com todos os semifinalistas
+        List<Equipe> semifinalistas = new ArrayList<>();// lista com todos os semifinalistas
         for (Jogo semi : semifinais) {
             semifinalistas.add(semi.getEquipe1());
             semifinalistas.add(semi.getEquipe2());

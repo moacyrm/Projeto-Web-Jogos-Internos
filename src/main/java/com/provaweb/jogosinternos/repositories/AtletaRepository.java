@@ -41,4 +41,14 @@ public interface AtletaRepository extends JpaRepository<Atleta, Long> {
 
     List<Atleta> findByCursoId(Long cursoId);
 
+    @Query("SELECT DISTINCT a FROM Atleta a JOIN a.equipe e WHERE e.curso.id = :cursoId AND a.equipe IS NOT NULL")
+    List<Atleta> findAtletasPorCursoIdComEquipe(@Param("cursoId") Long cursoId);
+
+    @Modifying
+    @Query("UPDATE Atleta a SET a.tecnico = false WHERE a.equipe.id = :equipeId")
+    void removerStatusTecnicoDaEquipe(@Param("equipeId") Long equipeId);
+
+    @Query("SELECT a FROM Atleta a WHERE a.curso.id = :cursoId AND a NOT IN " +
+            "(SELECT atl FROM Equipe e JOIN e.atletas atl WHERE e.evento.id = :eventoId)")
+    List<Atleta> findByCursoIdAndNotInEvento(@Param("cursoId") Long cursoId, @Param("eventoId") Long eventoId);
 }

@@ -37,4 +37,32 @@ public interface EquipeRepository extends JpaRepository<Equipe, Long> {
 
     boolean existsByEventoIdAndCursoIdAndEsporteId(Long eventoId, Long cursoId, Long esporteId);
 
+    @Query("SELECT e FROM Equipe e JOIN FETCH e.tecnico t WHERE t.matricula = :matricula")
+    Optional<Equipe> findByTecnicoMatricula(@Param("matricula") String matricula);
+
+    @Query("SELECT e FROM Equipe e LEFT JOIN FETCH e.tecnico WHERE e.id = :id")
+    Optional<Equipe> findByIdWithTecnico(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT e FROM Equipe e JOIN e.atletas a WHERE LOWER(a.matricula) = LOWER(:matricula) "
+            + "AND (:eventoId IS NULL OR e.evento.id = :eventoId)")
+    List<Equipe> findByAtletaMatriculaAndEventoId(@Param("matricula") String matricula,
+            @Param("eventoId") Long eventoId);
+
+    @Query("""
+             SELECT DISTINCT e
+             FROM Equipe e
+             JOIN e.atletas a
+             LEFT JOIN FETCH e.grupo g
+             LEFT JOIN FETCH e.esporte esp
+             LEFT JOIN FETCH e.curso c
+             LEFT JOIN FETCH e.campus cp
+             WHERE LOWER(a.matricula) = LOWER(:matricula)
+               AND (:eventoId IS NULL OR e.evento.id = :eventoId)
+            """)
+    List<Equipe> findByAtletaMatriculaAndEventoIdFetchAll(@Param("matricula") String matricula,
+            @Param("eventoId") Long eventoId);
+
+    boolean existsByEventoIdAndTecnicoMatricula(Long eventoId, String matriculaTecnico);
+
+    boolean existsByEventoIdAndAtletasMatricula(Long eventoId, String matriculaAtleta);
 }

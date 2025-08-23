@@ -1,6 +1,7 @@
 package com.provaweb.jogosinternos.controllers;
 
 import com.provaweb.jogosinternos.dto.ChaveDTO;
+import com.provaweb.jogosinternos.dto.ClassificacaoDTO;
 import com.provaweb.jogosinternos.dto.ClassificacaoPorEventoDTO;
 import com.provaweb.jogosinternos.dto.EliminatoriaDTO;
 import com.provaweb.jogosinternos.dto.JogoDTO;
@@ -77,5 +78,15 @@ public class EliminatoriaController {
     public ResponseEntity<List<ClassificacaoPorEventoDTO>> listarTop3PorEvento() {
         List<ClassificacaoPorEventoDTO> resultado = eliminatoriaService.listarTop3PorEvento();
         return ResponseEntity.ok(resultado);
+    }
+
+    @GetMapping("/classificacao/{eventoId}")
+    public ResponseEntity<List<ClassificacaoDTO>> getClassificacao(@PathVariable Long eventoId) {
+        try {
+            List<ClassificacaoDTO> classificacao = eliminatoriaService.calcularClassificacaoGeralEvento(eventoId);
+            return ResponseEntity.ok(classificacao);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
     }
 }

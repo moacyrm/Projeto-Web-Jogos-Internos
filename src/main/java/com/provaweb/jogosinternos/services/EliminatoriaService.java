@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EliminatoriaService {
 
-    //nome padrao para equipe que recebe bye
+    // nome padrao para equipe que recebe bye
     private static final String BYE_EQUIPE_NOME = "Bye";
 
     private final EventoRepository eventoRepository;
@@ -32,13 +32,13 @@ public class EliminatoriaService {
 
     @Transactional
     public ChaveEliminatoria gerarEliminatorias(Long eventoId) {
-        Evento evento = validarEvento(eventoId); //valida se o evento existe
-        validarChaveExistente(eventoId);//verifica se ja tem chave eliminatoria
-        List<Grupo> grupos = validarEGerarClassificacao(eventoId);//busca os grupos
+        Evento evento = validarEvento(eventoId); // valida se o evento existe
+        validarChaveExistente(eventoId);// verifica se ja tem chave eliminatoria
+        List<Grupo> grupos = validarEGerarClassificacao(eventoId);// busca os grupos
 
-        Map<String, List<Equipe>> equipesClassificadas = classificarEquipesPorGrupo(grupos);//pega os 2 melhores
+        Map<String, List<Equipe>> equipesClassificadas = classificarEquipesPorGrupo(grupos);// pega os 2 melhores
 
-        List<Equipe> equipesChaveadas = distribuirEquipesNaChave(//embaralha e distribui as equipes
+        List<Equipe> equipesChaveadas = distribuirEquipesNaChave(// embaralha e distribui as equipes
                 equipesClassificadas.get("primeiros"),
                 equipesClassificadas.get("segundos"));
 
@@ -71,7 +71,9 @@ public class EliminatoriaService {
         return grupos;
     }
 
-    private Map<String, List<Equipe>> classificarEquipesPorGrupo(List<Grupo> grupos) {//pra cada grupo, classifica as equipes e separa os primeiros dos segundos colocados
+    private Map<String, List<Equipe>> classificarEquipesPorGrupo(List<Grupo> grupos) {// pra cada grupo, classifica as
+                                                                                      // equipes e separa os primeiros
+                                                                                      // dos segundos colocados
         Map<String, List<Equipe>> resultado = new HashMap<>();
         List<Equipe> primeiros = new ArrayList<>();
         List<Equipe> segundos = new ArrayList<>();
@@ -94,17 +96,20 @@ public class EliminatoriaService {
         }
     }
 
-    private List<Equipe> classificarGrupo(Grupo grupo) {//ordena as equipes do grupo por pontos
+    private List<Equipe> classificarGrupo(Grupo grupo) {// ordena as equipes do grupo por pontos
         List<Jogo> jogos = jogoRepository.findByGrupoId(grupo.getId());
         List<ClassificacaoDTO> classificacao = calcularClassificacao(grupo.getEquipes(), jogos);
 
-        return classificacao.stream() //retorna as duas melhores
+        return classificacao.stream() // retorna as duas melhores
                 .limit(2)
                 .map(ClassificacaoDTO::getEquipe)
                 .collect(Collectors.toList());
     }
 
-    private List<ClassificacaoDTO> calcularClassificacao(List<Equipe> equipes, List<Jogo> jogos) {//calcula a classificação das equipes com base nos jogos
+    private List<ClassificacaoDTO> calcularClassificacao(List<Equipe> equipes, List<Jogo> jogos) {// calcula a
+                                                                                                  // classificação das
+                                                                                                  // equipes com base
+                                                                                                  // nos jogos
         List<ClassificacaoDTO> classificacao = equipes.stream()
                 .map(e -> new ClassificacaoDTO(e, 0, 0, 0, 0))
                 .collect(Collectors.toList());
@@ -122,7 +127,7 @@ public class EliminatoriaService {
         return ordenarClassificacao(classificacao);
     }
 
-    //busca dto classificacao de uma equipe
+    // busca dto classificacao de uma equipe
     private ClassificacaoDTO encontrarEquipeNaClassificacao(List<ClassificacaoDTO> classificacao, Equipe equipe) {
         return classificacao.stream()
                 .filter(dto -> dto.getEquipe().getId().equals(equipe.getId()))
@@ -130,7 +135,8 @@ public class EliminatoriaService {
                 .orElseThrow(() -> new RuntimeException("Equipe não encontrada na classificação"));
     }
 
-    private void atualizarClassificacao(Jogo jogo, ClassificacaoDTO dto1, ClassificacaoDTO dto2) {//atualiza apos cada jogo
+    private void atualizarClassificacao(Jogo jogo, ClassificacaoDTO dto1, ClassificacaoDTO dto2) {// atualiza apos cada
+                                                                                                  // jogo
         dto1.setPontosPro(dto1.getPontosPro() + jogo.getPlacarEquipe1());
         dto1.setPontosContra(dto1.getPontosContra() + jogo.getPlacarEquipe2());
         dto2.setPontosPro(dto2.getPontosPro() + jogo.getPlacarEquipe2());
@@ -149,7 +155,7 @@ public class EliminatoriaService {
         }
     }
 
-    //ordena por pontos, saldo e gols feitos
+    // ordena por pontos, saldo e gols feitos
     private List<ClassificacaoDTO> ordenarClassificacao(List<ClassificacaoDTO> classificacao) {
         return classificacao.stream()
                 .sorted(Comparator.comparingInt(ClassificacaoDTO::getPontos).reversed()
@@ -158,7 +164,8 @@ public class EliminatoriaService {
                 .collect(Collectors.toList());
     }
 
-    //distribui os classificados na chave eliminatória embaralhando e evitando confrontos entre equipes do mesmo grupo
+    // distribui os classificados na chave eliminatória embaralhando e evitando
+    // confrontos entre equipes do mesmo grupo
     private List<Equipe> distribuirEquipesNaChave(List<Equipe> primeiros, List<Equipe> segundos) {
         validarQuantidadeEquipes(primeiros, segundos);
         Collections.shuffle(primeiros);
@@ -168,26 +175,26 @@ public class EliminatoriaService {
         return intercalarEquipes(primeiros, segundosRearranjados);
     }
 
-    //valida se o número de equipes é igual entre os dois grupos
+    // valida se o número de equipes é igual entre os dois grupos
     private void validarQuantidadeEquipes(List<Equipe> primeiros, List<Equipe> segundos) {
         if (primeiros.size() != segundos.size()) {
             throw new RuntimeException("Número desigual de equipes entre primeiros e segundos colocados");
         }
     }
 
-    //evitar confrontos mesmo grupo
+    // evitar confrontos mesmo grupo
     private List<Equipe> evitarConfrontosMesmoGrupo(List<Equipe> primeiros, List<Equipe> segundos) {
-        for (int i = 0; i < primeiros.size(); i++) { //percorre todas as equipes em 1
-            Equipe primeiro = primeiros.get(i);//pega a equipe da posição i dos primeiros
-            boolean encontrouPar = false;//caso ache um segundo colocado de grupo diferente
+        for (int i = 0; i < primeiros.size(); i++) { // percorre todas as equipes em 1
+            Equipe primeiro = primeiros.get(i);// pega a equipe da posição i dos primeiros
+            boolean encontrouPar = false;// caso ache um segundo colocado de grupo diferente
 
-            for (int j = i; j < segundos.size(); j++) {//percorre os segundos a partir da posição i
-                Equipe segundo = segundos.get(j);//pega a equipe da posição j dos segundos
+            for (int j = i; j < segundos.size(); j++) {// percorre os segundos a partir da posição i
+                Equipe segundo = segundos.get(j);// pega a equipe da posição j dos segundos
 
-                if (!pertencemAoMesmoGrupo(primeiro, segundo)) {//verifica se sao do mesmo grupo
-                    if (j != i)//se j for diferente de i, troca as posicoes
-                        Collections.swap(segundos, i, j);//troca i e j na lista de segundos
-                    encontrouPar = true;//marca que encontrou equipe valida
+                if (!pertencemAoMesmoGrupo(primeiro, segundo)) {// verifica se sao do mesmo grupo
+                    if (j != i)// se j for diferente de i, troca as posicoes
+                        Collections.swap(segundos, i, j);// troca i e j na lista de segundos
+                    encontrouPar = true;// marca que encontrou equipe valida
                     break;
                 }
             }
@@ -200,13 +207,13 @@ public class EliminatoriaService {
         return segundos;
     }
 
-    //verifica se sao do mesmo grupo
+    // verifica se sao do mesmo grupo
     private boolean pertencemAoMesmoGrupo(Equipe e1, Equipe e2) {
         return e1.getGrupo() != null && e2.getGrupo() != null &&
                 e1.getGrupo().getId().equals(e2.getGrupo().getId());
     }
 
-    //intercala as equipes dos dois grupos
+    // intercala as equipes dos dois grupos
     private List<Equipe> intercalarEquipes(List<Equipe> primeiros, List<Equipe> segundos) {
         List<Equipe> chaveada = new ArrayList<>();
         for (int i = 0; i < primeiros.size(); i++) {
@@ -216,7 +223,7 @@ public class EliminatoriaService {
         return chaveada;
     }
 
-    //cria estrutura da chave eliminatória e os jogos da primeira fase
+    // cria estrutura da chave eliminatória e os jogos da primeira fase
     private ChaveEliminatoria criarEstruturaEliminatoria(Evento evento, List<Equipe> equipes) {
         ChaveEliminatoria chave = criarChaveEliminatoria(evento);
 
@@ -226,7 +233,7 @@ public class EliminatoriaService {
         return chave;
     }
 
-    //cria e salva a chave eliminatória
+    // cria e salva a chave eliminatória
     private ChaveEliminatoria criarChaveEliminatoria(Evento evento) {
         ChaveEliminatoria chave = new ChaveEliminatoria();
         chave.setEvento(evento);
@@ -236,39 +243,39 @@ public class EliminatoriaService {
     }
 
     private List<Jogo> criarJogosEliminatorios(List<Equipe> equipes, Evento evento, ChaveEliminatoria chave) {
-        ajustarQuantidadeEquipes(equipes, evento);//garante que o número de equipes é par, se necessario cria bye
-        List<Jogo> jogos = new ArrayList<>();//armazena os jogos eliminatorios criados
-        String fase = determinarFase(equipes.size());//define a fase com base no número de equipes
-        LocalDateTime dataBase = calcularDataBase(evento);//define a data base para os jogos
+        ajustarQuantidadeEquipes(equipes, evento);// garante que o número de equipes é par, se necessario cria bye
+        List<Jogo> jogos = new ArrayList<>();// armazena os jogos eliminatorios criados
+        String fase = determinarFase(equipes.size());// define a fase com base no número de equipes
+        LocalDateTime dataBase = calcularDataBase(evento);// define a data base para os jogos
 
-        for (int i = 0; i < equipes.size(); i += 2) {//percorre as equipes de 2 em 2
-            Equipe e1 = equipes.get(i);//pega a equipe da posição i
-            Equipe e2 = equipes.get(i + 1);//pega a equipe da posição i+1
+        for (int i = 0; i < equipes.size(); i += 2) {// percorre as equipes de 2 em 2
+            Equipe e1 = equipes.get(i);// pega a equipe da posição i
+            Equipe e2 = equipes.get(i + 1);// pega a equipe da posição i+1
 
             Jogo jogo = criarJogoEliminatorio(e1, e2, fase + " " + (i / 2 + 1), evento,
-                    dataBase.plusHours(jogos.size())); //cria um novo jogo eliminatório
-            jogo.setChaveEliminatoria(chave);//associa o jogo à chave eliminatória
+                    dataBase.plusHours(jogos.size())); // cria um novo jogo eliminatório
+            jogo.setChaveEliminatoria(chave);// associa o jogo à chave eliminatória
 
-            if (e1.getNome().equalsIgnoreCase(BYE_EQUIPE_NOME)) {//se a equipe 1 for a equipe bye
-                configurarBye(jogo, 0, 1);//da vitoria automatica
-            } else if (e2.getNome().equalsIgnoreCase(BYE_EQUIPE_NOME)) {//se a equipe 2 for bye
-                configurarBye(jogo, 1, 0);//da vitoria automatica
+            if (e1.getNome().equalsIgnoreCase(BYE_EQUIPE_NOME)) {// se a equipe 1 for a equipe bye
+                configurarBye(jogo, 0, 1);// da vitoria automatica
+            } else if (e2.getNome().equalsIgnoreCase(BYE_EQUIPE_NOME)) {// se a equipe 2 for bye
+                configurarBye(jogo, 1, 0);// da vitoria automatica
             }
 
-            jogos.add(jogo);//vai pra lista de jgos
+            jogos.add(jogo);// vai pra lista de jgos
         }
 
         return jogos;
     }
 
-    //adiciona a equipe bye se o número de equipes for ímpar
+    // adiciona a equipe bye se o número de equipes for ímpar
     private void ajustarQuantidadeEquipes(List<Equipe> equipes, Evento evento) {
         if (equipes.size() % 2 != 0) {
             equipes.add(criarEquipeBye(evento, equipes.get(0)));
         }
     }
 
-    //cria a equipe bye com base no modelo da primeira equipe
+    // cria a equipe bye com base no modelo da primeira equipe
     private Equipe criarEquipeBye(Evento evento, Equipe modelo) {
         return equipeService.buscarOuCriarEquipeBye(
                 evento,
@@ -277,7 +284,7 @@ public class EliminatoriaService {
                 modelo.getCampus());
     }
 
-    //determina a fase com base no número de equipes
+    // determina a fase com base no número de equipes
     private String determinarFase(int numEquipes) {
         return switch (numEquipes) {
             case 8 -> "Quartas de Final";
@@ -287,14 +294,15 @@ public class EliminatoriaService {
         };
     }
 
-    //calcula a data base para os jogos, considerando o último jogo do evento ou a data de início
+    // calcula a data base para os jogos, considerando o último jogo do evento ou a
+    // data de início
     private LocalDateTime calcularDataBase(Evento evento) {
         return jogoRepository.findTopByEventoIdOrderByDataHoraDesc(evento.getId())
                 .map(j -> j.getDataHora().plusDays(1))
                 .orElse(evento.getDataInicio().atTime(10, 0));
     }
 
-    //cria um jogo eliminatório com as equipes, fase, evento e data
+    // cria um jogo eliminatório com as equipes, fase, evento e data
     private Jogo criarJogoEliminatorio(Equipe e1, Equipe e2, String fase, Evento evento, LocalDateTime dataHora) {
         validarConfronto(e1, e2, fase);
 
@@ -308,14 +316,14 @@ public class EliminatoriaService {
         return jogo;
     }
 
-    //evita confronto do mesmo grupo antes da final
+    // evita confronto do mesmo grupo antes da final
     private void validarConfronto(Equipe e1, Equipe e2, String fase) {
         if (!"Final".equals(fase) && pertencemAoMesmoGrupo(e1, e2)) {
             System.out.println("Aviso: confronto entre equipes do mesmo grupo na fase " + fase);
         }
     }
 
-    //vitoria automatica contra bye
+    // vitoria automatica contra bye
     private void configurarBye(Jogo jogo, int placar1, int placar2) {
         jogo.setFinalizado(true);
         jogo.setPlacarEquipe1(placar1);
@@ -324,22 +332,23 @@ public class EliminatoriaService {
 
     @Transactional
     public List<JogoDTO> gerarFinais(Long eventoId) {
-        Evento evento = validarEvento(eventoId);//busca e valida o evento
-        List<Jogo> semifinais = validarSemifinais(eventoId);//verifica se existem seminfiains finalizadas
-        List<Equipe> finalistas = determinarFinalistas(semifinais);//determina as duas equipes da seminfinal
+        Evento evento = validarEvento(eventoId);// busca e valida o evento
+        List<Jogo> semifinais = validarSemifinais(eventoId);// verifica se existem seminfiains finalizadas
+        List<Equipe> finalistas = determinarFinalistas(semifinais);// determina as duas equipes da seminfinal
 
-        ChaveEliminatoria chave = chaveRepository.findByEventoId(eventoId)//busca a chave eliminatoria associada ao evento
+        ChaveEliminatoria chave = chaveRepository.findByEventoId(eventoId)// busca a chave eliminatoria associada ao
+                                                                          // evento
                 .orElseThrow(() -> new RuntimeException("Chave não encontrada para o evento"));
 
-        Jogo finalJogo = criarJogoFinal(evento, finalistas);//cria jogo representando a final
-        finalJogo.setChaveEliminatoria(chave);//associa esse jogo a chave eliminatoria do evento
+        Jogo finalJogo = criarJogoFinal(evento, finalistas);// cria jogo representando a final
+        finalJogo.setChaveEliminatoria(chave);// associa esse jogo a chave eliminatoria do evento
 
-        jogoRepository.save(finalJogo);//salva
+        jogoRepository.save(finalJogo);// salva
 
-        return List.of(new JogoDTO(finalJogo));//retorna o jogo em dto
+        return List.of(new JogoDTO(finalJogo));// retorna o jogo em dto
     }
 
-    //valida se existem semifinais finalizadas e retorna a lista
+    // valida se existem semifinais finalizadas e retorna a lista
     private List<Jogo> validarSemifinais(Long eventoId) {
         List<Jogo> semifinais = jogoRepository.findByEventoIdAndFaseStartingWith(eventoId, "Semifinal");
 
@@ -351,7 +360,7 @@ public class EliminatoriaService {
         return semifinais;
     }
 
-    //valida se todos os jogos de uma fase estão finalizados
+    // valida se todos os jogos de uma fase estão finalizados
     private void validarJogosFinalizados(List<Jogo> jogos, String fase) {
         for (Jogo jogo : jogos) {
             if (!jogo.isFinalizado()) {
@@ -360,14 +369,14 @@ public class EliminatoriaService {
         }
     }
 
-    //determina finalistas a aprtir dos vencedores da semifinais
+    // determina finalistas a aprtir dos vencedores da semifinais
     private List<Equipe> determinarFinalistas(List<Jogo> semifinais) {
         return semifinais.stream()
                 .map(j -> j.getPlacarEquipe1() > j.getPlacarEquipe2() ? j.getEquipe1() : j.getEquipe2())
                 .collect(Collectors.toList());
     }
 
-    //valida se as fases finais estao completas e determina a classificação final
+    // valida se as fases finais estao completas e determina a classificação final
     @Transactional(readOnly = true)
     public List<ClassificacaoDTO> getClassificacaoFinal(Long eventoId) {
         List<Jogo> finais = jogoRepository.findByEventoIdAndFase(eventoId, "Final");
@@ -377,27 +386,27 @@ public class EliminatoriaService {
         return determinarPodio(finais.get(0), semifinais);
     }
 
-    //valida se as fases finais estão completas
+    // valida se as fases finais estão completas
     private void validarFasesCompletas(List<Jogo> finais, List<Jogo> semifinais) {
         if (finais.size() != 1 || semifinais.size() != 2) {
             throw new RuntimeException("Fases eliminatórias incompletas");
         }
     }
 
-    //determina o podio do evento
+    // determina o podio do evento
     private List<ClassificacaoDTO> determinarPodio(Jogo finalJogo, List<Jogo> semifinais) {
-        List<ClassificacaoDTO> podio = new ArrayList<>();//armazena o podio final
+        List<ClassificacaoDTO> podio = new ArrayList<>();// armazena o podio final
 
-        Equipe campeao = determinarVencedor(finalJogo);//determina campeao
-        podio.add(new ClassificacaoDTO(campeao, 0, 0, 0, 0));//adiciona o campeao como 1 no podio
+        Equipe campeao = determinarVencedor(finalJogo);// determina campeao
+        podio.add(new ClassificacaoDTO(campeao, 0, 0, 0, 0));// adiciona o campeao como 1 no podio
 
-        Equipe vice = determinarPerdedor(finalJogo);//determina o vice
-        podio.add(new ClassificacaoDTO(vice, 0, 0, 0, 0));//adiciona
+        Equipe vice = determinarPerdedor(finalJogo);// determina o vice
+        podio.add(new ClassificacaoDTO(vice, 0, 0, 0, 0));// adiciona
 
         try {
-            Equipe terceiro = determinarTerceiroColocado(semifinais, campeao, vice);//tenta determinar o terceiro
-            if (terceiro != null && !terceiro.getNome().equalsIgnoreCase("Bye")) {//nao pode ser nulo nem bye
-                podio.add(new ClassificacaoDTO(terceiro, 0, 0, 0, 0));//adiciona
+            Equipe terceiro = determinarTerceiroColocado(semifinais, campeao, vice);// tenta determinar o terceiro
+            if (terceiro != null && !terceiro.getNome().equalsIgnoreCase("Bye")) {// nao pode ser nulo nem bye
+                podio.add(new ClassificacaoDTO(terceiro, 0, 0, 0, 0));// adiciona
             }
         } catch (RuntimeException e) {
             System.out.println("Não foi possível determinar o terceiro colocado: " + e.getMessage());
@@ -406,17 +415,17 @@ public class EliminatoriaService {
         return podio;
     }
 
-    //primeiro
+    // primeiro
     private Equipe determinarVencedor(Jogo jogo) {
         return jogo.getPlacarEquipe1() > jogo.getPlacarEquipe2() ? jogo.getEquipe1() : jogo.getEquipe2();
     }
 
-    //segundo
+    // segundo
     private Equipe determinarPerdedor(Jogo jogo) {
         return jogo.getPlacarEquipe1() < jogo.getPlacarEquipe2() ? jogo.getEquipe1() : jogo.getEquipe2();
     }
 
-    //terceiro
+    // terceiro
     private Equipe determinarTerceiroColocado(List<Jogo> semifinais, Equipe campeao, Equipe vice) {
         if (semifinais == null || semifinais.size() < 2) {
             throw new RuntimeException("Semifinais incompletas para determinar terceiro colocado");
@@ -432,8 +441,7 @@ public class EliminatoriaService {
                 .orElseThrow(() -> new RuntimeException("Não foi possível determinar o terceiro colocado"));
     }
 
-
-    //dtos
+    // dtos
     @Transactional
     public ChaveDTO gerarChaveDTO(Long eventoId) {
         ChaveEliminatoria chave = gerarEliminatorias(eventoId);
@@ -465,7 +473,7 @@ public class EliminatoriaService {
         return chave.getJogos().stream().map(EliminatoriaDTO::new).collect(Collectors.toList());
     }
 
-    //jogo final
+    // jogo final
     private Jogo criarJogoFinal(Evento evento, List<Equipe> finalistas) {
         return criarJogoEliminatorio(
                 finalistas.get(0),
@@ -475,7 +483,7 @@ public class EliminatoriaService {
                 calcularDataBase(evento));
     }
 
-    //gerar manualmente a proxima fase das eliminatorias
+    // gerar manualmente a proxima fase das eliminatorias
     public void gerarProximaFaseManual(Long eventoId, String novaFase) {
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
@@ -487,19 +495,19 @@ public class EliminatoriaService {
                 .filter(j -> j.getFase() != null && j.getFase().startsWith("Pré-Eliminatória") && j.isFinalizado())
                 .collect(Collectors.toList());
 
-        List<Equipe> classificados = anteriores.stream()//busca os jogos do evento
+        List<Equipe> classificados = anteriores.stream()// busca os jogos do evento
                 .map(j -> j.getPlacarEquipe1() > j.getPlacarEquipe2() ? j.getEquipe1() : j.getEquipe2())
-                .collect(Collectors.toList());//pega os vencedores e converte pra lsitas de classificados
+                .collect(Collectors.toList());// pega os vencedores e converte pra lsitas de classificados
 
-        if (classificados.size() % 2 != 0) {//caso for impar cria o bye
+        if (classificados.size() % 2 != 0) {// caso for impar cria o bye
             classificados.add(equipeService.buscarOuCriarEquipeBye(evento, classificados.get(0).getEsporte(),
                     classificados.get(0).getCurso(), classificados.get(0).getCampus()));
         }
 
-        List<Jogo> novosJogos = new ArrayList<>();//armazena os jogos da nova fase
+        List<Jogo> novosJogos = new ArrayList<>();// armazena os jogos da nova fase
         LocalDateTime baseData = calcularDataBase(evento);
 
-        for (int i = 0; i < classificados.size(); i += 2) {//percorre de 2 em 2
+        for (int i = 0; i < classificados.size(); i += 2) {// percorre de 2 em 2
             Equipe e1 = classificados.get(i);
             Equipe e2 = classificados.get(i + 1);
 
@@ -518,8 +526,7 @@ public class EliminatoriaService {
         jogoRepository.saveAll(novosJogos);
     }
 
-
-    //gera automaticamente a proxima fase das eliminatorias
+    // gera automaticamente a proxima fase das eliminatorias
     @Transactional
     public void gerarProximaFase(Long eventoId, String novaFase) {
         Evento evento = validarEvento(eventoId);
@@ -564,8 +571,7 @@ public class EliminatoriaService {
         jogoRepository.saveAll(novosJogos);
     }
 
-
-    //dto top 3
+    // dto top 3
     @Transactional(readOnly = true)
     public Map<Long, List<ClassificacaoDTO>> getTop3PorEvento() {
         List<Evento> eventos = eventoRepository.findAll();
@@ -590,15 +596,22 @@ public class EliminatoriaService {
 
         for (Evento evento : eventos) {
             try {
-                List<ClassificacaoDTO> top3Completo = getClassificacaoFinal(evento.getId());
+                List<ClassificacaoDTO> classificacao;
 
-                // Verificação adicional
-                if (top3Completo.size() < 3) {
-                    System.out.println("Aviso: Classificação final do evento " + evento.getNome() +
-                            " contém apenas " + top3Completo.size() + " equipes");
+                try {
+                    // Tenta obter a classificação final completa
+                    classificacao = getClassificacaoFinal(evento.getId());
+                } catch (RuntimeException e) {
+                    // Se não conseguir, tenta obter uma classificação parcial
+                    classificacao = calcularClassificacaoGeralEvento(evento.getId());
+
+                    // Filtra apenas as primeiras 3 equipes para o top 3
+                    if (classificacao.size() > 3) {
+                        classificacao = classificacao.subList(0, 3);
+                    }
                 }
 
-                List<ClassificacaoSimplesDTO> top3Simplificado = top3Completo.stream()
+                List<ClassificacaoSimplesDTO> top3Simplificado = classificacao.stream()
                         .filter(c -> !c.getEquipe().getNome().equalsIgnoreCase("Bye"))
                         .map(c -> new ClassificacaoSimplesDTO(
                                 c.getEquipe().getNome(),
@@ -614,7 +627,12 @@ public class EliminatoriaService {
                         top3Simplificado));
 
             } catch (RuntimeException e) {
-                System.out.println("Evento " + evento.getNome() + " não possui classificação final.");
+                System.out.println("Evento " + evento.getNome() + " não possui classificação: " + e.getMessage());
+
+                resultado.add(new ClassificacaoPorEventoDTO(
+                        evento.getNome(),
+                        evento.getTipoEvento().name(),
+                        new ArrayList<>()));
             }
         }
         return resultado;

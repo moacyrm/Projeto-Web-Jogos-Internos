@@ -6,9 +6,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.provaweb.jogosinternos.entities.Admin;
 import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.entities.Evento;
 import com.provaweb.jogosinternos.entities.TipoEvento;
+import com.provaweb.jogosinternos.repositories.AdminRepository;
 import com.provaweb.jogosinternos.repositories.EquipeRepository;
 import com.provaweb.jogosinternos.repositories.EventoRepository;
 import com.provaweb.jogosinternos.repositories.GrupoRepository;
@@ -23,9 +25,15 @@ public class EventoService {
     private final EquipeRepository equipeRepository;
     private final GrupoRepository grupoRepository;
     private final JogoRepository jogoRepository;
+    private final AdminRepository adminRepository;
 
-    public Evento criarEvento(Evento evento) {
+    public Evento criarEvento(Evento evento, String matriculaAdmin) {
         validarDatas(evento);
+
+        Admin admin = adminRepository.findByMatriculaIgnoreCase(matriculaAdmin)
+                .orElseThrow(() -> new RuntimeException("Admin não encontrado"));
+
+        evento.setCriadoPor(admin);
         return eventoRepository.save(evento);
     }
 

@@ -1,6 +1,10 @@
 package com.provaweb.jogosinternos.services;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -94,8 +98,12 @@ public class AtletaService {
         Atleta atleta = atletaRepository.findById(atletaId)
                 .orElseThrow(() -> new EntityNotFoundException("Atleta não encontrado"));
 
-        // Remove status de técnico de qualquer outro atleta do mesmo curso
-        atletaRepository.removerStatusTecnicoDoCurso(atleta.getCurso().getId());
+        if (atleta.getEquipe() == null) {
+            throw new RuntimeException("Atleta não está vinculado a uma equipe");
+        }
+
+        Long equipeId = atleta.getEquipe().getId();
+        atletaRepository.removerStatusTecnicoDaEquipe(equipeId);
 
         atleta.setTecnico(true);
         return atletaRepository.save(atleta);
@@ -138,6 +146,56 @@ public class AtletaService {
 
     public List<Atleta> findAtletasSemEquipe() {
         return atletaRepository.findByEquipeIsNull();
+    }
+
+    public List<Atleta> listarAtletasPorCursoSemDuplicatas(Long cursoId) {
+
+        List<Atleta> atletas = atletaRepository.findAtletasPorCursoIdComEquipe(cursoId);
+
+        if (atletas == null || atletas.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LinkedHashMap<String, Atleta> mapa = new LinkedHashMap<>();
+        for (Atleta a : atletas) {
+            String key = a.getMatricula() != null ? a.getMatricula() : "id:" + a.getId();
+            mapa.putIfAbsent(key, a);
+        }
+
+        return new ArrayList<>(mapa.values());
+    }
+
+    public List<AtletaDTO> listarAtletasDTOPorCurso(Long cursoId) {
+        if (cursoId == null) {
+            return Collections.emptyList();
+        }
+
+        List<Atleta> atletas = atletaRepository.findAtletasPorCursoIdComEquipe(cursoId);
+
+        if (atletas == null || atletas.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashMap<String, Atleta> mapa = new LinkedHashMap<>();
+        for (Atleta a : atletas) {
+            String key = a.getMatricula() != null ? a.getMatricula().trim().toLowerCase() : "id:" + a.getId();
+            mapa.putIfAbsent(key, a);
+        }
+
+        return mapa.values().stream().map(a -> {
+            AtletaDTO dto = new AtletaDTO();
+            dto.setId(a.getId());
+            dto.setNomeCompleto(a.getNomeCompleto());
+            dto.setApelido(a.getApelido());
+            dto.setMatricula(a.getMatricula());
+            dto.setTelefone(a.getTelefone());
+            dto.setTecnico(a.isTecnico());
+            if (a.getEquipe() != null) {
+                dto.setEquipeNome(a.getEquipe().getNome());
+                dto.setEsporteNome(a.getEquipe().getEsporte() != null ? a.getEquipe().getEsporte().getNome() : null);
+                dto.setEventoNome(a.getEquipe().getEvento() != null ? a.getEquipe().getEvento().getNome() : null);
+            }
+            return dto;
+        }).collect(Collectors.toList());
     }
 
 }

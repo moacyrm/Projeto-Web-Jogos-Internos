@@ -12,6 +12,7 @@ public class EquipeDTO {
     private String esporte;
     private String grupo;
     private String evento;
+    private Long eventoId;
     private String curso;
 
     public EquipeDTO(Equipe equipe) {
@@ -20,6 +21,7 @@ public class EquipeDTO {
         this.esporte = equipe.getEsporte() != null ? equipe.getEsporte().getNome() : null;
         this.grupo = equipe.getGrupo() != null ? equipe.getGrupo().getNome() : null;
         this.evento = equipe.getEvento() != null ? equipe.getEvento().getNome() : null;
+        this.eventoId = equipe.getEvento() != null ? equipe.getEvento().getId() : null;
         this.curso = equipe.getCurso() != null ? equipe.getCurso().getNome() : null;
     }
 }

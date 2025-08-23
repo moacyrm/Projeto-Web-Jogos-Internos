@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.provaweb.jogosinternos.dto.AtualizarPlacarDTO;
 import com.provaweb.jogosinternos.dto.JogoDTO;
+import com.provaweb.jogosinternos.entities.Arbitro;
 import com.provaweb.jogosinternos.entities.Jogo;
+import com.provaweb.jogosinternos.repositories.ArbitroRepository;
 import com.provaweb.jogosinternos.services.JogoService;
 
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JogoController {
     private final JogoService jogoService;
+    private final ArbitroRepository arbitroRepository;
 
     @PostMapping
     public Jogo criar(@RequestBody Jogo jogo) {
@@ -99,11 +102,12 @@ public class JogoController {
 
     @GetMapping("/atleta/matricula/{matricula}")
     public ResponseEntity<List<JogoDTO>> listarPorMatriculaAtleta(
-            @PathVariable String matricula) {
+            @PathVariable String matricula,
+            @RequestParam(required = false) Long eventoId) {
 
-        System.out.println("Buscando jogos para matrícula: " + matricula);
+        System.out.println("Buscando jogos para matrícula: " + matricula + ", evento: " + eventoId);
 
-        List<Jogo> jogos = jogoService.listarPorMatriculaAtleta(matricula);
+        List<Jogo> jogos = jogoService.listarPorMatriculaAtleta(matricula, eventoId);
         List<JogoDTO> dtos = jogos.stream()
                 .map(JogoDTO::new)
                 .collect(Collectors.toList());
@@ -112,8 +116,37 @@ public class JogoController {
     }
 
     @GetMapping("/coordenador/{matricula}")
-    public ResponseEntity<List<Jogo>> listarJogosPorCoordenador(@PathVariable String matricula) {
-        List<Jogo> jogos = jogoService.buscarJogosPorCoordenador(matricula);
-        return ResponseEntity.ok(jogos);
+    public ResponseEntity<List<JogoDTO>> listarJogosPorCoordenador(
+            @PathVariable String matricula,
+            @RequestParam(required = false) Long eventoId) {
+        List<Jogo> jogos = jogoService.buscarJogosPorCoordenador(matricula, eventoId);
+        List<JogoDTO> dtos = jogos.stream()
+                .map(JogoDTO::new)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
+
+    @PutMapping("/{id}/definir-placar")
+    public Jogo definirPlacar(
+            @PathVariable Long id,
+            @RequestParam int placarEquipe1,
+            @RequestParam int placarEquipe2,
+            @RequestParam String matriculaArbitro) {
+
+        Jogo jogo = jogoService.buscarPorId(id);
+
+        Arbitro arbitro = arbitroRepository.findByMatricula(matriculaArbitro)
+                .orElseThrow(() -> new RuntimeException("Árbitro não encontrado"));
+
+        if (!jogo.getArbitro().getId().equals(arbitro.getId())) {
+            throw new RuntimeException("Somente o árbitro designado pode definir o placar deste jogo.");
+        }
+
+        jogo.setPlacarEquipe1(placarEquipe1);
+        jogo.setPlacarEquipe2(placarEquipe2);
+        jogo.setStatus("FINALIZADO");
+
+        return jogoService.salvar(jogo);
+    }
+
 }

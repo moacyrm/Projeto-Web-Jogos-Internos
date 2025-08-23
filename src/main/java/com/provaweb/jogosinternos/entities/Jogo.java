@@ -55,4 +55,9 @@ public class Jogo {
 
     @ManyToOne
     private Jogo jogoAnteriorEquipe2;
+
+    @ManyToOne
+    @JoinColumn(name = "arbitro_id")
+    private Arbitro arbitro;
+
 }

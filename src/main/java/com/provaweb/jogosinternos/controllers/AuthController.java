@@ -1,8 +1,10 @@
 package com.provaweb.jogosinternos.controllers;
 
 import com.provaweb.jogosinternos.dto.LoginRequestDTO;
+import com.provaweb.jogosinternos.entities.Admin;
 import com.provaweb.jogosinternos.entities.Atleta;
 import com.provaweb.jogosinternos.entities.Coordenador;
+import com.provaweb.jogosinternos.repositories.AdminRepository;
 import com.provaweb.jogosinternos.repositories.AtletaRepository;
 import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class AuthController {
 
     private final AtletaRepository atletaRepository;
     private final CoordenadorRepository coordenadorRepository;
+    private final AdminRepository adminRepository;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDTO login) {
@@ -51,6 +54,17 @@ public class AuthController {
                 response.put("cursoId", coord.getCurso().getId());
             }
 
+            return ResponseEntity.ok(response);
+        }
+
+        Admin admin = adminRepository.findByMatriculaIgnoreCase(matricula).orElse(null);
+        if (admin != null && senha.equals(admin.getSenha() == null ? "" : admin.getSenha().trim())) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("tipo", "ADMIN");
+            response.put("id", admin.getId());
+            response.put("matricula", admin.getMatricula());
+            response.put("nome", admin.getNome());
+            // não retorne senha ou campos sensíveis
             return ResponseEntity.ok(response);
         }
 

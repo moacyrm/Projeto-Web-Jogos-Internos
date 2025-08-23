@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.provaweb.jogosinternos.entities.Atleta;
+import com.provaweb.jogosinternos.dto.AtletaDTO;
 import com.provaweb.jogosinternos.entities.Coordenador;
 import com.provaweb.jogosinternos.entities.Equipe;
 import com.provaweb.jogosinternos.services.CoordenadorService;
@@ -60,7 +60,7 @@ public class CoordenadorController {
     }
 
     @GetMapping("/atletas")
-    public ResponseEntity<List<Atleta>> listarAtletasPorCurso(
+    public ResponseEntity<List<AtletaDTO>> listarAtletasPorCurso(
             @RequestParam String matriculaCoordenador) {
         return coordenadorService.listarAtletasPorCurso(matriculaCoordenador);
     }
@@ -70,4 +70,14 @@ public class CoordenadorController {
         Coordenador coordenador = coordenadorService.buscarPorId(matricula);
         return ResponseEntity.ok(coordenador);
     }
+
+    @PostMapping("/{matricula}/equipes")
+    public ResponseEntity<?> criarEquipePorCoordenador(
+            @PathVariable String matricula,
+            @RequestBody Equipe equipe,
+            @RequestParam(required = false) Long tecnicoId) {
+
+        return coordenadorService.criarEquipePorCoordenador(matricula, equipe, tecnicoId);
+    }
+
 }

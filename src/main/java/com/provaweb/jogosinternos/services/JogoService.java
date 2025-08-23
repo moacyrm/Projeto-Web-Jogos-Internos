@@ -3,6 +3,7 @@ package com.provaweb.jogosinternos.services;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -89,9 +90,13 @@ public class JogoService {
         jogoRepository.delete(jogo);
     }
 
-    private Jogo buscarPorId(Long id) {
+    public Jogo buscarPorId(Long id) {
         return jogoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("jogo não encontrado"));
+    }
+
+    public Jogo salvar(Jogo jogo) {
+        return jogoRepository.save(jogo);
     }
 
     private void validarJogo(Jogo jogo) {
@@ -132,7 +137,7 @@ public class JogoService {
         return jogoRepository.findByEquipeId(equipeId);
     }
 
-    public List<Jogo> listarPorMatriculaAtleta(String matricula) {
+    public List<Jogo> listarPorMatriculaAtleta(String matricula, Long eventoId) {
         Atleta atleta = atletaRepository.findByMatriculaWithEquipe(matricula)
                 .orElseThrow(() -> new EntityNotFoundException("Atleta não encontrado"));
 
@@ -142,11 +147,18 @@ public class JogoService {
                     "Você não está vinculado a nenhuma equipe");
         }
 
-        // Agora passando a mesma equipe para ambos os parâmetros
-        return jogoRepository.findByEquipe1OrEquipe2WithDetails(atleta.getEquipe(), atleta.getEquipe());
+        List<Jogo> jogos = jogoRepository.findByEquipe1OrEquipe2WithDetails(atleta.getEquipe(), atleta.getEquipe());
+
+        if (eventoId != null) {
+            jogos = jogos.stream()
+                    .filter(jogo -> jogo.getEvento() != null && eventoId.equals(jogo.getEvento().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return jogos;
     }
 
-    public List<Jogo> buscarJogosPorCoordenador(String matricula) {
+    public List<Jogo> buscarJogosPorCoordenador(String matricula, Long eventoId) {
         Coordenador coordenador = coordenadorRepository.findById(matricula)
                 .orElseThrow(() -> new RuntimeException("Coordenador não encontrado"));
 
@@ -154,7 +166,14 @@ public class JogoService {
             return Collections.emptyList();
         }
 
-        // Usando a consulta JPQL corrigida
-        return jogoRepository.findByCursoId(coordenador.getCurso().getId());
+        List<Jogo> jogos = jogoRepository.findByCursoId(coordenador.getCurso().getId());
+
+        if (eventoId != null) {
+            jogos = jogos.stream()
+                    .filter(jogo -> jogo.getEvento() != null && eventoId.equals(jogo.getEvento().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return jogos;
     }
 }

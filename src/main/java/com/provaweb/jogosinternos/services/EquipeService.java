@@ -1,18 +1,29 @@
 package com.provaweb.jogosinternos.services;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.provaweb.jogosinternos.dto.AtletaDTO;
 import com.provaweb.jogosinternos.dto.AtletaResumoDTO;
 import com.provaweb.jogosinternos.dto.EquipeDetalhesDTO;
 import com.provaweb.jogosinternos.dto.JogoResumoDTO;
+import com.provaweb.jogosinternos.dto.RankingDTO;
 import com.provaweb.jogosinternos.entities.*;
 import com.provaweb.jogosinternos.repositories.AtletaRepository;
+import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
 import com.provaweb.jogosinternos.repositories.EquipeRepository;
 import com.provaweb.jogosinternos.repositories.EsporteRepository;
+import com.provaweb.jogosinternos.repositories.EventoRepository;
 import com.provaweb.jogosinternos.repositories.JogoRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -25,6 +36,8 @@ public class EquipeService {
     private final EsporteRepository esporteRepository;
     private final AtletaRepository atletaRepository;
     private final JogoRepository jogoRepository;
+    private final CoordenadorRepository coordenadorRepository;
+    private final EventoRepository eventoRepository;
 
     public Equipe cadastEquipe(Equipe equipe, Long tecnicoId) {
         if (equipe.getEvento() == null || equipe.getEvento().getId() == null) {
@@ -79,10 +92,6 @@ public class EquipeService {
         return equipeRepository.findById(id).orElseThrow(() -> new RuntimeException("Equipe não encontrada."));
     }
 
-    public List<Equipe> listPorEvento(Long eventoId) {
-        return equipeRepository.findByEventoId(eventoId);
-    }
-
     public Equipe atualizarEquipe(Long id, Equipe novaEquipe) {
         Equipe equipeExistente = buscarPorId(id);
 
@@ -110,7 +119,7 @@ public class EquipeService {
     }
 
     public List<Equipe> buscarEquipesPorEvento(Long eventoId) {
-        return equipeRepository.findByEventoEventoId(eventoId);
+        return equipeRepository.findByEventoId(eventoId);
     }
 
     public EquipeDetalhesDTO getEquipeDetalhesPorMatriculaAtleta(String matricula) {
@@ -181,13 +190,11 @@ public class EquipeService {
             }
         }
 
-        // Preenche as estatísticas no DTO
         dto.setJogosDisputados(jogosFinalizados.size());
         dto.setVitorias(vitorias);
         dto.setDerrotas(derrotas);
         dto.setPontuacao(vitorias * 3); // 3 pontos por vitória
 
-        // Mapeia próximos jogos (não finalizados e com data futura)
         List<Jogo> proximosJogos = todosJogos.stream()
                 .filter(j -> !j.isFinalizado() && j.getDataHora().isAfter(LocalDateTime.now()))
                 .collect(Collectors.toList());
@@ -205,6 +212,253 @@ public class EquipeService {
         return dto;
     }
 
+    public List<EquipeDetalhesDTO> getEquipesDetalhesPorMatriculaCoordenador(String matriculaCoordenador) {
+        var coordenador = coordenadorRepository.findById(matriculaCoordenador)
+                .orElseThrow(() -> new RuntimeException("Coordenador não encontrado"));
 
+        if (coordenador.getCurso() == null) {
+            throw new RuntimeException("Coordenador não possui curso vinculado");
+        }
 
+        Long cursoId = coordenador.getCurso().getId();
+        List<Equipe> equipes = equipeRepository.findByCursoId(cursoId);
+
+        return equipes.stream()
+                .map(this::mapToEquipeDetalhesDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Equipe criarEquipePorCoordenador(String matriculaCoordenador, Equipe novaEquipe, Long tecnicoId) {
+        var coordenador = coordenadorRepository.findById(matriculaCoordenador)
+                .orElseThrow(() -> new RuntimeException("Coordenador não encontrado"));
+
+        if (coordenador.getCurso() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Coordenador não possui curso associado");
+        }
+
+        // força o curso do coordenador (evita criar para outro curso)
+        novaEquipe.setCurso(coordenador.getCurso());
+
+        // valida unicidade (proteção também feita pela constraint DB)
+        if (equipeRepository.existsByEventoIdAndCursoIdAndEsporteId(
+                novaEquipe.getEvento().getId(),
+                novaEquipe.getCurso().getId(),
+                novaEquipe.getEsporte().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Já existe equipe para esse evento/esporte/curso");
+        }
+
+        // salvar equipe (status DRAFT por padrão)
+        Equipe salva = equipeRepository.save(novaEquipe);
+
+        // se passou tecnicoId, valida e atribui
+        if (tecnicoId != null) {
+            Atleta tecnico = atletaService.buscarPorId(tecnicoId);
+            // validar que atleta pertence ao mesmo curso (usar equipe.curso)
+            Long cursoAtletaId = tecnico.getCurso() != null ? tecnico.getCurso().getId()
+                    : (tecnico.getEquipe() != null && tecnico.getEquipe().getCurso() != null
+                            ? tecnico.getEquipe().getCurso().getId()
+                            : null);
+
+            if (cursoAtletaId == null || !cursoAtletaId.equals(salva.getCurso().getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Técnico não pertence ao curso desta equipe");
+            }
+
+            // atualiza atleta para essa equipe e marca tecnico
+            atletaService.atualizarEquipe(tecnicoId, salva.getId(), tecnicoId);
+        }
+
+        return salva;
+    }
+
+    @Transactional
+    public Equipe submitEquipe(Long equipeId, Long tecnicoId) {
+        Equipe equipe = equipeRepository.findByIdWithTecnico(equipeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipe não encontrada"));
+
+        if (equipe.getTecnico() == null || !equipe.getTecnico().getId().equals(tecnicoId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas o técnico pode submeter a equipe");
+        }
+
+        int qtd = atletaService.buscarPorEquipe(equipeId).size();
+
+        Esporte esporte = esporteRepository.findById(equipe.getEsporte().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Esporte não encontrado"));
+
+        if (qtd < esporte.getMinimoAtletas()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Equipe não possui atletas suficientes: mínimo " + esporte.getMinimoAtletas());
+        }
+        if (qtd > esporte.getMaximoAtletas()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Equipe possui mais atletas que o máximo: máximo " + esporte.getMaximoAtletas());
+        }
+
+        equipe.setStatus(EquipeStatus.ENVIADO);
+        return equipeRepository.save(equipe);
+    }
+
+    public EquipeDetalhesDTO getEquipeDetalhesPorId(Long equipeId) {
+        Equipe equipe = buscarPorId(equipeId);
+        return mapToEquipeDetalhesDTO(equipe);
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.provaweb.jogosinternos.dto.EquipeDTO> listarEquipesPorMatriculaAtleta(String matricula,
+            Long eventoId) {
+        List<Equipe> equipes = equipeRepository.findByAtletaMatriculaAndEventoIdFetchAll(matricula, eventoId);
+        return equipes.stream()
+                .map(Equipe::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Equipe criarEquipeParaEvento(String nome, Long eventoId, Long esporteId, String matriculaTecnico) {
+        Atleta tecnico = atletaRepository.findByMatriculaIgnoreCase(matriculaTecnico)
+                .orElseThrow(() -> new RuntimeException("Técnico não encontrado"));
+
+        Evento evento = eventoRepository.findById(eventoId)
+                .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
+
+        Esporte esporte = esporteRepository.findById(esporteId)
+                .orElseThrow(() -> new RuntimeException("Esporte não encontrado"));
+
+        // Verificar se já existe equipe para este técnico no evento
+        boolean existeEquipe = equipeRepository.existsByEventoIdAndTecnicoMatricula(eventoId, matriculaTecnico);
+        if (existeEquipe) {
+            throw new RuntimeException("Você já possui uma equipe neste evento");
+        }
+
+        // Verificar se já existe equipe do mesmo curso/esporte no evento
+        boolean existeInscricao = equipeRepository.existsByEventoIdAndCursoIdAndEsporteId(
+                eventoId, tecnico.getCurso().getId(), esporteId);
+        if (existeInscricao) {
+            throw new RuntimeException("Já existe uma equipe deste curso/esporte no evento");
+        }
+
+        Equipe equipe = new Equipe();
+        equipe.setNome(nome);
+        equipe.setEvento(evento);
+        equipe.setEsporte(esporte);
+        equipe.setCurso(tecnico.getCurso());
+        equipe.setTecnico(tecnico);
+        equipe.setStatus(EquipeStatus.PROJETO);
+
+        Equipe equipeSalva = equipeRepository.save(equipe);
+
+        // Adicionar o técnico como atleta da equipe
+        adicionarAtleta(equipeSalva.getId(), tecnico.getId(), matriculaTecnico);
+
+        return equipeSalva;
+    }
+
+    public boolean verificarInscricao(Long eventoId, String matriculaTecnico) {
+        return equipeRepository.existsByEventoIdAndTecnicoMatricula(eventoId, matriculaTecnico);
+    }
+
+    @Transactional
+    public void adicionarAtleta(Long equipeId, Long atletaId, String matriculaTecnico) {
+        Equipe equipe = equipeRepository.findById(equipeId)
+                .orElseThrow(() -> new RuntimeException("Equipe não encontrada"));
+
+        // Verificar se o usuário é o técnico da equipe
+        if (!equipe.getTecnico().getMatricula().equals(matriculaTecnico)) {
+            throw new RuntimeException("Apenas o técnico pode adicionar atletas");
+        }
+
+        Atleta atleta = atletaRepository.findById(atletaId)
+                .orElseThrow(() -> new RuntimeException("Atleta não encontrado"));
+
+        // Verificar se o atleta pertence ao mesmo curso
+        if (!atleta.getCurso().getId().equals(equipe.getCurso().getId())) {
+            throw new RuntimeException("O atleta deve ser do mesmo curso");
+        }
+
+        // Verificar se o atleta já está em outra equipe no mesmo evento
+        boolean jaInscrito = equipeRepository.existsByEventoIdAndAtletasMatricula(
+                equipe.getEvento().getId(), atleta.getMatricula());
+        if (jaInscrito) {
+            throw new RuntimeException("Este atleta já está em outra equipe no evento");
+        }
+
+        Esporte esporte = equipe.getEsporte();
+        int quantidadeAtletas = equipe.getAtletas().size();
+        if (quantidadeAtletas >= esporte.getMaximoAtletas()) {
+            throw new RuntimeException("Limite máximo de atletas atingido para este esporte");
+        }
+
+        equipe.getAtletas().add(atleta);
+        atleta.setEquipe(equipe);
+
+        equipeRepository.save(equipe);
+        atletaRepository.save(atleta);
+    }
+
+    public List<AtletaDTO> listarAtletasDisponiveis(Long eventoId, String matriculaTecnico) {
+        Atleta tecnico = atletaRepository.findByMatriculaIgnoreCase(matriculaTecnico)
+                .orElseThrow(() -> new RuntimeException("Técnico não encontrado"));
+
+        List<Atleta> atletasDisponiveis = atletaRepository.findByCursoIdAndNotInEvento(
+                tecnico.getCurso().getId(), eventoId);
+
+        return atletasDisponiveis.stream()
+                .map(atleta -> new AtletaDTO(atleta.getId(), atleta.getNomeCompleto(), atleta.getMatricula()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankingDTO> calcularRankingPorEvento(Long eventoId) {
+        List<Equipe> equipes = equipeRepository.findByEventoId(eventoId);
+        List<Jogo> jogos = jogoRepository.findByEventoId(eventoId);
+
+        Map<String, RankingDTO> rankingMap = new HashMap<>();
+
+        // Inicializar ranking para todas as equipes
+        for (Equipe equipe : equipes) {
+            if (!equipe.getNome().equalsIgnoreCase("Bye")) {
+                rankingMap.put(equipe.getNome(), new RankingDTO(equipe.getNome(), 0, 0, 0));
+            }
+        }
+
+        // Processar todos os jogos
+        for (Jogo jogo : jogos) {
+            if (!jogo.isFinalizado())
+                continue;
+
+            if (jogo.getEquipe1().getNome().equalsIgnoreCase("Bye") ||
+                    jogo.getEquipe2().getNome().equalsIgnoreCase("Bye")) {
+                continue;
+            }
+
+            RankingDTO equipe1 = rankingMap.get(jogo.getEquipe1().getNome());
+            RankingDTO equipe2 = rankingMap.get(jogo.getEquipe2().getNome());
+
+            if (equipe1 != null && equipe2 != null) {
+                // Atualizar estatísticas
+                equipe1.setJogos(equipe1.getJogos() + 1);
+                equipe2.setJogos(equipe2.getJogos() + 1);
+
+                equipe1.setSaldoGols(equipe1.getSaldoGols() + jogo.getPlacarEquipe1() - jogo.getPlacarEquipe2());
+                equipe2.setSaldoGols(equipe2.getSaldoGols() + jogo.getPlacarEquipe2() - jogo.getPlacarEquipe1());
+
+                // Determinar pontos
+                if (jogo.getPlacarEquipe1() > jogo.getPlacarEquipe2()) {
+                    equipe1.setPontos(equipe1.getPontos() + 3);
+                } else if (jogo.getPlacarEquipe1() < jogo.getPlacarEquipe2()) {
+                    equipe2.setPontos(equipe2.getPontos() + 3);
+                } else {
+                    equipe1.setPontos(equipe1.getPontos() + 1);
+                    equipe2.setPontos(equipe2.getPontos() + 1);
+                }
+            }
+        }
+
+        // Converter para lista e ordenar por pontos (e saldo de gols em caso de empate)
+        List<RankingDTO> ranking = new ArrayList<>(rankingMap.values());
+        return ranking.stream()
+                .sorted(Comparator.comparingInt(RankingDTO::getPontos).reversed()
+                        .thenComparingInt(RankingDTO::getSaldoGols).reversed())
+                .collect(Collectors.toList());
+    }
 }

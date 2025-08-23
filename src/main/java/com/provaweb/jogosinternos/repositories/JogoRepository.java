@@ -78,7 +78,10 @@ public interface JogoRepository extends JpaRepository<Jogo, Long> {
     @Query("SELECT j FROM Jogo j LEFT JOIN FETCH j.equipe1 LEFT JOIN FETCH j.equipe2 WHERE j.equipe1 = :equipe1 OR j.equipe2 = :equipe2")
     List<Jogo> findByEquipe1OrEquipe2WithDetails(@Param("equipe1") Equipe equipe1, @Param("equipe2") Equipe equipe2);
 
-    @Query("SELECT j FROM Jogo j " +
-            "WHERE j.equipe1.curso.id = :cursoId OR j.equipe2.curso.id = :cursoId")
+    @Query("SELECT DISTINCT j FROM Jogo j " +
+            "LEFT JOIN FETCH j.equipe1 e1 " +
+            "LEFT JOIN FETCH j.equipe2 e2 " +
+            "WHERE e1.curso.id = :cursoId OR e2.curso.id = :cursoId")
     List<Jogo> findByCursoId(@Param("cursoId") Long cursoId);
+
 }

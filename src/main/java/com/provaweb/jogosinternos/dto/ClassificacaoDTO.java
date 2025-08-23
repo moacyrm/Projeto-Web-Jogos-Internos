@@ -13,5 +13,4 @@ public class ClassificacaoDTO {
     private int saldo;
     private int pontosPro;
     private int pontosContra;
-    
 }
