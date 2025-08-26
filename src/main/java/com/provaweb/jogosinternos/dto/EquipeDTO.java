@@ -14,6 +14,7 @@ public class EquipeDTO {
     private String evento;
     private Long eventoId;
     private String curso;
+    private Long atletasCount;
 
     public EquipeDTO(Equipe equipe) {
         this.id = equipe.getId();
@@ -23,5 +24,9 @@ public class EquipeDTO {
         this.evento = equipe.getEvento() != null ? equipe.getEvento().getNome() : null;
         this.eventoId = equipe.getEvento() != null ? equipe.getEvento().getId() : null;
         this.curso = equipe.getCurso() != null ? equipe.getCurso().getNome() : null;
+    }
+
+    public void setAtletasCount(Long atletasCount) {
+        this.atletasCount = atletasCount;
     }
 }

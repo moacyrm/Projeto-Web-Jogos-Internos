@@ -15,11 +15,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.provaweb.jogosinternos.dto.AtletaDTO;
 import com.provaweb.jogosinternos.dto.AtletaResumoDTO;
+import com.provaweb.jogosinternos.dto.EquipeDTO;
 import com.provaweb.jogosinternos.dto.EquipeDetalhesDTO;
 import com.provaweb.jogosinternos.dto.JogoResumoDTO;
 import com.provaweb.jogosinternos.dto.RankingDTO;
 import com.provaweb.jogosinternos.entities.*;
 import com.provaweb.jogosinternos.repositories.AtletaRepository;
+import com.provaweb.jogosinternos.repositories.CampusRepository;
 import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
 import com.provaweb.jogosinternos.repositories.EquipeRepository;
 import com.provaweb.jogosinternos.repositories.EsporteRepository;
@@ -38,6 +40,7 @@ public class EquipeService {
     private final JogoRepository jogoRepository;
     private final CoordenadorRepository coordenadorRepository;
     private final EventoRepository eventoRepository;
+    private final CampusRepository campusRepository;
 
     public Equipe cadastEquipe(Equipe equipe, Long tecnicoId) {
         if (equipe.getEvento() == null || equipe.getEvento().getId() == null) {
@@ -314,16 +317,27 @@ public class EquipeService {
     }
 
     @Transactional
-    public Equipe criarEquipeParaEvento(String nome, Long eventoId, Long esporteId, String matriculaTecnico) {
+    public Equipe criarEquipeParaEvento(String nome, Long eventoId, Long esporteId, Long campusId,
+            String matriculaTecnico) {
         Atleta tecnico = atletaRepository.findByMatriculaIgnoreCase(matriculaTecnico)
                 .orElseThrow(() -> new RuntimeException("Técnico não encontrado"));
 
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() -> new RuntimeException("Evento não encontrado"));
 
+        boolean tecnicoEmOutraEquipe = equipeRepository.existsByTecnicoAndEvento(
+                tecnico.getId(),
+                eventoId);
+
+        if (tecnicoEmOutraEquipe) {
+            throw new RuntimeException("Este técnico já está associado a outra equipe neste evento");
+        }
+
         Esporte esporte = esporteRepository.findById(esporteId)
                 .orElseThrow(() -> new RuntimeException("Esporte não encontrado"));
 
+        Campus campus = campusRepository.findById(campusId)
+                .orElseThrow(() -> new RuntimeException("Campus não encontrado"));
         // Verificar se já existe equipe para este técnico no evento
         boolean existeEquipe = equipeRepository.existsByEventoIdAndTecnicoMatricula(eventoId, matriculaTecnico);
         if (existeEquipe) {
@@ -342,6 +356,7 @@ public class EquipeService {
         equipe.setEvento(evento);
         equipe.setEsporte(esporte);
         equipe.setCurso(tecnico.getCurso());
+        equipe.setCampus(campus);
         equipe.setTecnico(tecnico);
         equipe.setStatus(EquipeStatus.PROJETO);
 
@@ -460,5 +475,65 @@ public class EquipeService {
                 .sorted(Comparator.comparingInt(RankingDTO::getPontos).reversed()
                         .thenComparingInt(RankingDTO::getSaldoGols).reversed())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void removerTodosAtletasDasEquipes() {
+        // Primeiro: atualiza todos os atletas para remover a referência da equipe
+        atletaRepository.removerEquipeDeTodosAtletas();
+
+        // Segundo: limpa a lista de atletas de todas as equipes
+        List<Equipe> equipes = equipeRepository.findAll();
+        for (Equipe equipe : equipes) {
+            equipe.getAtletas().clear();
+        }
+        equipeRepository.saveAll(equipes);
+    }
+
+    // EquipeService.java
+    @Transactional
+    public Equipe associarTecnico(Long equipeId, String matriculaTecnico) {
+        Equipe equipe = equipeRepository.findById(equipeId)
+                .orElseThrow(() -> new RuntimeException("Equipe não encontrada"));
+
+        Atleta tecnico = atletaRepository.findByMatriculaIgnoreCase(matriculaTecnico)
+                .orElseThrow(() -> new RuntimeException("Técnico não encontrado"));
+
+        // Verificar se o técnico já está em outra equipe neste evento
+        boolean tecnicoEmOutraEquipe = equipeRepository.existsByEventoIdAndTecnicoMatricula(
+                equipe.getEvento().getId(), matriculaTecnico);
+
+        if (tecnicoEmOutraEquipe) {
+            throw new RuntimeException("Este técnico já está associado a outra equipe neste evento");
+        }
+
+        // Verificar se o técnico pertence ao mesmo curso da equipe
+        if (!tecnico.getCurso().getId().equals(equipe.getCurso().getId())) {
+            throw new RuntimeException("O técnico deve ser do mesmo curso da equipe");
+        }
+
+        equipe.setTecnico(tecnico);
+        return equipeRepository.save(equipe);
+    }
+
+    public List<Equipe> buscarPorCursoEsporteEvento(Long cursoId, Long esporteId, Long eventoId) {
+        return equipeRepository.findByCursoIdAndEsporteIdAndEventoId(cursoId, esporteId, eventoId);
+    }
+
+    public List<EquipeDTO> buscarEquipesPorCursoEsporteEvento(Long cursoId, Long esporteId, Long eventoId) {
+        List<Equipe> equipes = equipeRepository.findByCursoIdAndEsporteIdAndEventoId(cursoId, esporteId, eventoId);
+
+        return equipes.stream().map(equipe -> {
+            EquipeDTO dto = new EquipeDTO();
+            dto.setId(equipe.getId());
+            dto.setNome(equipe.getNome());
+            dto.setEvento(equipe.getEvento() != null ? equipe.getEvento().getNome() : null);
+            dto.setEsporte(equipe.getEsporte() != null ? equipe.getEsporte().getNome() : null);
+            dto.setCurso(equipe.getCurso() != null ? equipe.getCurso().getNome() : null);
+            long atletasCount = atletaRepository.countByEquipeId(equipe.getId());
+            dto.setAtletasCount(atletasCount);
+
+            return dto;
+        }).collect(Collectors.toList());
     }
 }

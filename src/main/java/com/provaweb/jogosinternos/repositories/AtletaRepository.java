@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.provaweb.jogosinternos.entities.Atleta;
 
@@ -51,4 +52,9 @@ public interface AtletaRepository extends JpaRepository<Atleta, Long> {
     @Query("SELECT a FROM Atleta a WHERE a.curso.id = :cursoId AND a NOT IN " +
             "(SELECT atl FROM Equipe e JOIN e.atletas atl WHERE e.evento.id = :eventoId)")
     List<Atleta> findByCursoIdAndNotInEvento(@Param("cursoId") Long cursoId, @Param("eventoId") Long eventoId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE atleta SET equipe_id = NULL WHERE equipe_id IS NOT NULL", nativeQuery = true)
+    void removerEquipeDeTodosAtletas();
 }

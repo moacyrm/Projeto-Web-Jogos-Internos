@@ -1,7 +1,10 @@
 package com.provaweb.jogosinternos.controllers;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.provaweb.jogosinternos.dto.AtletaDTO;
 import com.provaweb.jogosinternos.entities.Coordenador;
 import com.provaweb.jogosinternos.entities.Equipe;
+import com.provaweb.jogosinternos.repositories.CoordenadorRepository;
+import com.provaweb.jogosinternos.services.AtletaService;
 import com.provaweb.jogosinternos.services.CoordenadorService;
 
 import lombok.RequiredArgsConstructor;
@@ -26,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 public class CoordenadorController {
 
     private final CoordenadorService coordenadorService;
+    private final CoordenadorRepository coordenadorRepository;
+    private final AtletaService atletaService;
 
     @PostMapping
     public Coordenador criar(@RequestBody Coordenador coordenador) {
@@ -60,9 +67,27 @@ public class CoordenadorController {
     }
 
     @GetMapping("/atletas")
-    public ResponseEntity<List<AtletaDTO>> listarAtletasPorCurso(
+    public ResponseEntity<?> listarAtletasPorCurso(
             @RequestParam String matriculaCoordenador) {
-        return coordenadorService.listarAtletasPorCurso(matriculaCoordenador);
+        try {
+            var coordenador = coordenadorRepository.findById(matriculaCoordenador)
+                    .orElseThrow(() -> new RuntimeException("Coordenador não encontrado"));
+
+            if (coordenador.getCurso() == null) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+
+            Long cursoId = coordenador.getCurso().getId();
+            List<AtletaDTO> dtos = atletaService.listarAtletasDTOPorCurso(cursoId);
+
+            return ResponseEntity.ok(dtos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erro interno ao buscar atletas"));
+        }
     }
 
     @GetMapping("/{matricula}")

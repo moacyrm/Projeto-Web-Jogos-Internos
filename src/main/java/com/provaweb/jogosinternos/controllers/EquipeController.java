@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -107,7 +108,7 @@ public class EquipeController {
     }
 
     @PostMapping("/criar-para-evento")
-    public ResponseEntity<EquipeDTO> criarEquipeParaEvento(
+    public ResponseEntity<?> criarEquipeParaEvento(
             @RequestBody CriarEquipeRequest request,
             @RequestParam String matriculaTecnico) {
         try {
@@ -115,10 +116,13 @@ public class EquipeController {
                     request.getNome(),
                     request.getEventoId(),
                     request.getEsporteId(),
+                    request.getCampusId(),
                     matriculaTecnico);
             return ResponseEntity.ok(novaEquipe.toDTO());
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Erro ao criar equipe",
+                    "message", e.getMessage()));
         }
     }
 
@@ -158,6 +162,45 @@ public class EquipeController {
             return ResponseEntity.ok(ranking);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @DeleteMapping("/limpar-atletas")
+    public ResponseEntity<String> limparAtletasDasEquipes() {
+        try {
+            equipeService.removerTodosAtletasDasEquipes();
+            return ResponseEntity.ok("Atletas removidos de todas as equipes.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao remover atletas: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/por-curso-esporte")
+    public ResponseEntity<List<EquipeDTO>> getEquipesPorCursoEsporteEvento(
+            @RequestParam Long cursoId,
+            @RequestParam Long esporteId,
+            @RequestParam Long eventoId) {
+        try {
+            List<EquipeDTO> dtos = equipeService.buscarEquipesPorCursoEsporteEvento(cursoId, esporteId, eventoId);
+            return ResponseEntity.ok(dtos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+    }
+
+    @PutMapping("/{id}/associar-tecnico")
+    public ResponseEntity<?> associarTecnico(
+            @PathVariable Long id,
+            @RequestParam String matriculaTecnico) {
+        try {
+            Equipe equipe = equipeService.associarTecnico(id, matriculaTecnico);
+            return ResponseEntity.ok(equipe.toDTO());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Erro ao associar técnico",
+                    "message", e.getMessage()));
         }
     }
 }
