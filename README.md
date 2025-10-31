@@ -62,11 +62,3 @@ O sistema foi desenvolvido com
 * Frontend de consumo da API (se ainda não desenvolvido).
 * Documentação Swagger/OpenAPI para exposição dos endpoints.
 * Deploy em ambiente de produção ou nuvem.
-
-## 🤝 Como contribuir
-
-1. Faça um fork deste repositório.
-2. Crie uma nova branch para sua feature ou correção: `git checkout -b feature/nova-funcionalidade`.
-3. Realize suas modificações e commit com mensagens claras: `git commit -m "Descrição da mudança"`.
-4. Envie para o repositório remoto: `git push origin feature/nova-funcionalidade`.
-5. Crie um Pull Request explicando o que foi modificado e por quê.
